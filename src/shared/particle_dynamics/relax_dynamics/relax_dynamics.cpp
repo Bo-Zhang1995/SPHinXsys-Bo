@@ -27,11 +27,12 @@ Real GetTimeStepSizeSquare::outputResult(Real reduced_value)
 //=================================================================================================//
 RelaxationAccelerationInner::RelaxationAccelerationInner(BaseInnerRelation &inner_relation)
     : LocalDynamics(inner_relation.getSPHBody()), RelaxDataDelegateInner(inner_relation),
-      acc_(particles_->acc_), pos_(particles_->pos_) {}
+      acc_(particles_->acc_), pos_(particles_->pos_){}
 //=================================================================================================//
 RelaxationAccelerationInnerWithLevelSetCorrection::
     RelaxationAccelerationInnerWithLevelSetCorrection(BaseInnerRelation &inner_relation)
-    : RelaxationAccelerationInner(inner_relation), sph_adaptation_(sph_body_.sph_adaptation_)
+    : RelaxationAccelerationInner(inner_relation), sph_adaptation_(sph_body_.sph_adaptation_),
+    constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
     level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
 }
@@ -119,7 +120,6 @@ RelaxationStepInner::
     {
         relaxation_acceleration_inner_ =
             makeUnique<InteractionDynamics<RelaxationAccelerationInnerWithLevelSetCorrection>>(inner_relation);
-		surface_correction_ = makeShared<SimpleDynamics<NearSurfaceVolumeCorrection>>(near_shape_surface_);
 	}
 }
 //=================================================================================================//
@@ -172,13 +172,12 @@ void RelaxationStepByStressInner::exec(Real dt)
     relaxation_acceleration_inner_->exec();
     Real dt_square = get_time_step_square_.exec();
     update_particle_position_.exec(dt_square);
-    surface_correction_->exec();
 }
 //=================================================================================================//
 RelaxationAccelerationComplexWithLevelSetCorrection::
     RelaxationAccelerationComplexWithLevelSetCorrection(ComplexRelation &complex_relation, const std::string &shape_name)
-    : RelaxationAccelerationComplex(complex_relation),
-      sph_adaptation_(sph_body_.sph_adaptation_)
+    : RelaxationAccelerationComplex(complex_relation), sph_adaptation_(sph_body_.sph_adaptation_),
+      constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
     ComplexShape &complex_shape = DynamicCast<ComplexShape>(this, *sph_body_.body_shape_);
     level_set_shape_ = DynamicCast<LevelSetShape>(this, complex_shape.getShapeByName(shape_name));
@@ -215,19 +214,111 @@ void RelaxationStepComplex::exec(Real dt)
     surface_bounding_.exec();
 }
 //=================================================================================================//
+RelaxationAccelerationByCMInner::RelaxationAccelerationByCMInner(BaseInnerRelation& inner_relation)
+    : LocalDynamics(inner_relation.getSPHBody()), RelaxDataDelegateInner(inner_relation),
+    acc_(particles_->acc_), pos_(particles_->pos_),
+    B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")) {}
+//=================================================================================================//
+RelaxationAccelerationByCMInnerWithLevelSetCorrection::
+RelaxationAccelerationByCMInnerWithLevelSetCorrection(BaseInnerRelation& inner_relation)
+    : RelaxationAccelerationByCMInner(inner_relation), sph_adaptation_(sph_body_.sph_adaptation_),
+    constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
+{
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
+}
+//=================================================================================================//
+RelaxationStepByCMInner::RelaxationStepByCMInner(BaseInnerRelation& inner_relation, bool level_set_correction)
+    : BaseDynamics<void>(inner_relation.getSPHBody()), real_body_(inner_relation.real_body_),
+    inner_relation_(inner_relation),
+    near_shape_surface_(*real_body_), get_time_step_square_(*real_body_),
+    update_particle_position_(*real_body_), surface_bounding_(near_shape_surface_)
+{
+    if (!level_set_correction)
+    {
+        relaxation_acceleration_inner_ =
+            makeUnique<InteractionDynamics<RelaxationAccelerationByCMInner>>(inner_relation);
+    }
+    else
+    {
+        relaxation_acceleration_inner_ =
+            makeUnique<InteractionDynamics<RelaxationAccelerationByCMInnerWithLevelSetCorrection>>(inner_relation);
+    }
+}
+//=================================================================================================//
+void RelaxationStepByCMInner::exec(Real dt)
+{
+    relaxation_acceleration_inner_->exec();
+    Real dt_square = get_time_step_square_.exec();
+    update_particle_position_.exec(dt_square);
+    real_body_->updateCellLinkedList();
+    inner_relation_.updateConfiguration();
+}
+//=================================================================================================//
+RelaxationAccelerationByCMComplex::
+RelaxationAccelerationByCMComplex(ComplexRelation& complex_relation)
+    : LocalDynamics(complex_relation.getSPHBody()), 
+    RelaxDataDelegateComplex(complex_relation),
+    acc_(particles_->acc_), pos_(particles_->pos_),
+    B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix"))
+{
+    contact_B_.resize(this->contact_particles_.size());
+    for (size_t k = 0; k != this->contact_particles_.size(); ++k)
+    {
+        contact_B_[k] = this->contact_particles_[k]->template registerSharedVariable<Matd>("CorrectionMatrix");
+    }
+}
+//=================================================================================================//
+RelaxationAccelerationByCMComplexWithLevelSetCorrection::
+RelaxationAccelerationByCMComplexWithLevelSetCorrection(ComplexRelation& complex_relation, const std::string& shape_name)
+    : RelaxationAccelerationByCMComplex(complex_relation), sph_adaptation_(sph_body_.sph_adaptation_),
+      constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
+{
+    ComplexShape& complex_shape = DynamicCast<ComplexShape>(this, *sph_body_.body_shape_);
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, complex_shape.getShapeByName(shape_name));
+}
+//=================================================================================================//
+RelaxationStepByCMComplex::RelaxationStepByCMComplex(ComplexRelation& complex_relation,
+    const std::string& shape_name, bool level_set_correction)
+    : BaseDynamics<void>(complex_relation.getSPHBody()),
+    real_body_(complex_relation.getInnerRelation().real_body_),
+    complex_relation_(complex_relation),
+    near_shape_surface_(*real_body_, shape_name),
+    get_time_step_square_(*real_body_), update_particle_position_(*real_body_),
+    surface_bounding_(near_shape_surface_)
+{
+    if (!level_set_correction)
+    {
+        relaxation_acceleration_complex_ =
+            makeUnique<InteractionDynamics<RelaxationAccelerationByCMComplex>>(complex_relation);
+    }
+    else
+    {
+        relaxation_acceleration_complex_ =
+            makeUnique<InteractionDynamics<RelaxationAccelerationByCMComplexWithLevelSetCorrection>>(complex_relation, shape_name);
+    }
+}
+//=================================================================================================//
+void RelaxationStepByCMComplex::exec(Real dt)
+{
+    real_body_->updateCellLinkedList();
+    complex_relation_.updateConfiguration();
+    relaxation_acceleration_complex_->exec();
+    Real dt_square = get_time_step_square_.exec();
+    update_particle_position_.exec(dt_square);
+    surface_bounding_.exec();
+}
+//****************************************IMPLICIT SCHEME******************************************//
+//=================================================================================================//
 RelaxationImplicitInner::RelaxationImplicitInner(BaseInnerRelation& inner_relation)
 	: LocalDynamics(inner_relation.getSPHBody()), RelaxDataDelegateInner(inner_relation),
-	kernel_(inner_relation.getSPHBody().sph_adaptation_->getKernel()), target_error_p_(1.0),
+	kernel_(inner_relation.getSPHBody().sph_adaptation_->getKernel()),
 	Vol_(particles_->Vol_), pos_(particles_->pos_), acc_(particles_->acc_),
-	sph_adaptation_(sph_body_.sph_adaptation_)
+	sph_adaptation_(sph_body_.sph_adaptation_),
+    constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
-	particles_->registerVariable(implicit_residue_p_, "implicit_residue_p_");
-	particles_->addVariableToWrite<Real>("implicit_residue_p_");
-	particles_->addVariableToWrite<Real>("VolumetricMeasure");
-	level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-
-	particles_->registerVariable(error_p_, "error_p_");
-	particles_->addVariableToWrite<Real>("error_p_");
+    particles_->registerVariable(implicit_residual_pressure_, "ImplicitResidualPressure");
+    particles_->addVariableToWrite<Real>("ImplicitResidualPressure");
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
 };
 //=================================================================================================//
 ErrorAndParameters<Vecd, Matd, Matd> RelaxationImplicitInner::computeErrorAndParameters(size_t index_i, Real dt)
@@ -274,62 +365,62 @@ void RelaxationImplicitInner::interaction(size_t index_i, Real dt)
 	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters = computeErrorAndParameters(index_i, dt);
 	updateStates(index_i, dt, error_and_parameters);
 	acc_[index_i] = -error_and_parameters.error_ / dt / dt;
-	implicit_residue_p_[index_i] = (error_and_parameters.error_ / dt / dt).norm();
-
-	error_p_[index_i] = error_and_parameters.error_.norm();
+	implicit_residual_pressure_[index_i] = (error_and_parameters.error_ / dt / dt).norm();
 }
 //=================================================================================================//
-RelaxationImplicitInnerWithLevelSetCorrection::
-RelaxationImplicitInnerWithLevelSetCorrection(BaseInnerRelation& inner_relation)
+RelaxationImplicitInnerWithLevelSetCorrection::RelaxationImplicitInnerWithLevelSetCorrection(BaseInnerRelation& inner_relation)
 	: RelaxationImplicitInner(inner_relation) {}
 //=================================================================================================//
-ErrorAndParameters<Vecd, Matd, Matd> RelaxationImplicitInnerWithLevelSetCorrection::
-computeErrorAndParameters(size_t index_i, Real dt)
+ErrorAndParameters<Vecd, Matd, Matd> RelaxationImplicitInnerWithLevelSetCorrection::computeErrorAndParameters(size_t index_i, Real dt)
 {
 	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters = RelaxationImplicitInner::computeErrorAndParameters(index_i, dt);
-	error_and_parameters.error_ += 2.0 * level_set_shape_->computeKernelGradientIntegral(pos_[index_i],
-		sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt;
-	error_and_parameters.a_ -= 2.0 * level_set_shape_->computeKernelSecondGradientIntegral(pos_[index_i],
-		sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt;
+    Real phi = level_set_shape_->findSignedDistance(pos_[index_i]);
+    Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
+    if (phi > -constrained_distance_)
+    {
+        error_and_parameters.error_ += 2.0 * level_set_shape_->computeKernelGradientIntegral(pos_[index_i],
+            sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 + overlap);
+	    error_and_parameters.a_ -= 2.0 * level_set_shape_->computeKernelSecondGradientIntegral(pos_[index_i],
+		    sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1);
+    }
+    else
+    {
+        error_and_parameters.error_ += 2.0 * level_set_shape_->computeKernelGradientIntegral(pos_[index_i],
+            sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 - overlap);
+	    error_and_parameters.a_ -= 2.0 * level_set_shape_->computeKernelSecondGradientIntegral(pos_[index_i],
+		    sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1);
+    };
 	return error_and_parameters;
 }
 //=================================================================================================//
 RelaxationStepImplicitInner::RelaxationStepImplicitInner(BaseInnerRelation& inner_relation, bool level_set_correction)
 	: BaseDynamics<void>(inner_relation.getSPHBody()), real_body_(inner_relation.real_body_),
-	inner_relation_(inner_relation), time_step_size_(0.01), target_error_p_(1.0),
+	inner_relation_(inner_relation), time_step_size_(0.01),
 	near_shape_surface_(*real_body_), get_time_step_(*real_body_),
-	relaxation_evolution_inner_(inner_relation), surface_bounding_(near_shape_surface_),
-	surface_correction_(near_shape_surface_),
-	update_averaged_error_(inner_relation.getSPHBody(), "error_p_") {}
+	relaxation_evolution_inner_(inner_relation), surface_bounding_(near_shape_surface_) {}
 //=================================================================================================//
 void RelaxationStepImplicitInner::exec(Real dt)
 {
-	//real_body_->updateCellLinkedList();
-	//inner_relation_.updateConfiguration();
-	relaxation_evolution_inner_.exec(dt);
-	//time_step_size_ = 20 * sqrt(get_time_step_.exec());
-	//surface_correction_.exec(); 
-	//surface_bounding_.exec();
-	target_error_p_ = update_averaged_error_.exec();
-	relaxation_evolution_inner_.updateTargetError(target_error_p_);
+    time_step_size_ = sqrt(get_time_step_.exec());
+	relaxation_evolution_inner_.exec(time_step_size_);
+    real_body_->updateCellLinkedList();
+    inner_relation_.updateConfiguration();
 }
 //=================================================================================================//
-RelaxationByStressImplicitInner::RelaxationByStressImplicitInner(BaseInnerRelation& inner_relation)
+RelaxationByCMImplicitInner::RelaxationByCMImplicitInner(BaseInnerRelation& inner_relation)
 	: LocalDynamics(inner_relation.getSPHBody()), RelaxDataDelegateInner(inner_relation),
-	kernel_(inner_relation.getSPHBody().sph_adaptation_->getKernel()), target_error_s_(1.0),
+    kernel_(inner_relation.getSPHBody().sph_adaptation_->getKernel()),
 	Vol_(particles_->Vol_), pos_(particles_->pos_), acc_(particles_->acc_),
 	B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")),
-	sph_adaptation_(sph_body_.sph_adaptation_)
+	sph_adaptation_(sph_body_.sph_adaptation_),
+    constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
-	particles_->registerVariable(implicit_residue_s_, "implicit_residue_s_");
-	particles_->addVariableToWrite<Real>("implicit_residue_s_");
+	particles_->registerVariable(implicit_residual_cm_, "ImplicitResidualCM");
+	particles_->addVariableToWrite<Real>("ImplicitResidualCM");
 	level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-
-	particles_->registerVariable(error_s_, "error_s_");
-	particles_->addVariableToWrite<Real>("error_s_");
 };
 //=================================================================================================//
-ErrorAndParameters<Vecd, Matd, Matd> RelaxationByStressImplicitInner::computeErrorAndParameters(size_t index_i, Real dt)
+ErrorAndParameters<Vecd, Matd, Matd> RelaxationByCMImplicitInner::computeErrorAndParameters(size_t index_i, Real dt)
 {
 	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters;
 	Neighborhood& inner_neighborhood = inner_configuration_[index_i];
@@ -350,7 +441,7 @@ ErrorAndParameters<Vecd, Matd, Matd> RelaxationByStressImplicitInner::computeErr
 	return error_and_parameters;
 }
 //=================================================================================================//
-void RelaxationByStressImplicitInner::updateStates(size_t index_i, Real dt,
+void RelaxationByCMImplicitInner::updateStates(size_t index_i, Real dt,
 	const ErrorAndParameters<Vecd, Matd, Matd>& error_and_parameters)
 {
 	Matd parameter_l = error_and_parameters.a_ * error_and_parameters.a_ + error_and_parameters.c_;
@@ -368,84 +459,92 @@ void RelaxationByStressImplicitInner::updateStates(size_t index_i, Real dt,
 	}
 }
 //=================================================================================================//
-void RelaxationByStressImplicitInner::interaction(size_t index_i, Real dt)
+void RelaxationByCMImplicitInner::interaction(size_t index_i, Real dt)
 {
 	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters = computeErrorAndParameters(index_i, dt);
 	updateStates(index_i, dt, error_and_parameters);
 	acc_[index_i] = -error_and_parameters.error_ / dt / dt;
-	implicit_residue_s_[index_i] = (error_and_parameters.error_ / dt / dt).norm();
-
-	error_s_[index_i] = error_and_parameters.error_.norm();
+	implicit_residual_cm_[index_i] = (error_and_parameters.error_ / dt / dt).norm();
 }
 //=================================================================================================//
-RelaxationByStressImplicitInnerWithLevelSetCorrection::
-RelaxationByStressImplicitInnerWithLevelSetCorrection(BaseInnerRelation& inner_relation)
-	: RelaxationByStressImplicitInner(inner_relation) {};
+RelaxationByCMImplicitInnerWithLevelSetCorrection::
+RelaxationByCMImplicitInnerWithLevelSetCorrection(BaseInnerRelation& inner_relation)
+	: RelaxationByCMImplicitInner(inner_relation) {};
 //=================================================================================================//
-ErrorAndParameters<Vecd, Matd, Matd> RelaxationByStressImplicitInnerWithLevelSetCorrection::
+ErrorAndParameters<Vecd, Matd, Matd> RelaxationByCMImplicitInnerWithLevelSetCorrection::
 computeErrorAndParameters(size_t index_i, Real dt)
 {
-	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters = RelaxationByStressImplicitInner::computeErrorAndParameters(index_i, dt);
-
-	error_and_parameters.error_ += (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
-		pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt;
-	error_and_parameters.a_ -= (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelSecondGradientIntegral(
-		pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt;
+	ErrorAndParameters<Vecd, Matd, Matd> error_and_parameters = RelaxationByCMImplicitInner::computeErrorAndParameters(index_i, dt);
+    Real phi = level_set_shape_->findSignedDistance(pos_[index_i]);
+    Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
+    if (phi > -constrained_distance_)
+    {
+        error_and_parameters.error_ += (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
+            pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 + overlap);
+	    error_and_parameters.a_ -= (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelSecondGradientIntegral(
+		    pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 + overlap);
+    }
+    else
+    {
+        error_and_parameters.error_ += (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
+            pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 - overlap);
+	    error_and_parameters.a_ -= (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelSecondGradientIntegral(
+		    pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * dt * dt * (1 - overlap);
+    };
 	return error_and_parameters;
 }
 //=================================================================================================//
-RelaxationStepByStressImplicitInner::RelaxationStepByStressImplicitInner(BaseInnerRelation& inner_relation, bool level_set_correction)
-	: BaseDynamics<void>(inner_relation.getSPHBody()), real_body_(inner_relation.real_body_),
-	inner_relation_(inner_relation), time_step_size_(0.01), target_error_s_(1.0),
-	near_shape_surface_(*real_body_), get_time_step_(*real_body_),
-	relaxation_evolution_inner_(inner_relation), surface_bounding_(near_shape_surface_),
-	surface_correction_(near_shape_surface_),
-	update_averaged_error_(inner_relation.getSPHBody(), "error_s_") {};
+RelaxationStepByCMImplicitInner::RelaxationStepByCMImplicitInner(BaseInnerRelation &inner_relation, bool level_set_correction)
+    : BaseDynamics<void>(inner_relation.getSPHBody()),
+      time_step_size_(0.01), real_body_(inner_relation.real_body_),
+      inner_relation_(inner_relation), near_shape_surface_(*real_body_),
+      get_time_step_(*real_body_), relaxation_evolution_inner_(inner_relation),
+      surface_bounding_(near_shape_surface_){};
 //=================================================================================================//
-void RelaxationStepByStressImplicitInner::exec(Real dt)
+void RelaxationStepByCMImplicitInner::exec(Real dt)
 {
-	//real_body_->updateCellLinkedList();
-	//inner_relation_.updateConfiguration();
-	relaxation_evolution_inner_.exec(time_step_size_);
-	time_step_size_ = 20 * sqrt(get_time_step_.exec());
-	//surface_correction_.exec();
-	//surface_bounding_.exec();
-	target_error_s_ = update_averaged_error_.exec();
-	relaxation_evolution_inner_.updateTargetError(target_error_s_);
+    time_step_size_ = 50 * sqrt(get_time_step_.exec());
+    relaxation_evolution_inner_.exec(time_step_size_);
+    real_body_->updateCellLinkedList();
+    inner_relation_.updateConfiguration();
 }
 //=================================================================================================//
-CalculateParticleStress::CalculateParticleStress(BaseInnerRelation& inner_relation, bool level_set_correction)
-	: LocalDynamics(inner_relation.getSPHBody()), RelaxDataDelegateInner(inner_relation),
-	pos_(particles_->pos_), level_set_correction_(level_set_correction),
-	sph_adaptation_(sph_body_.sph_adaptation_)
+CorrectedConfigurationInnerWithLevelSet::
+    CorrectedConfigurationInnerWithLevelSet(BaseInnerRelation &inner_relation, bool level_set_correction)
+    : LocalDynamics(inner_relation.getSPHBody()),
+      RelaxDataDelegateInner(inner_relation),
+      pos_(particles_->pos_),
+      B_with_level_set_(*particles_->getVariableByName<Matd>("CorrectionMatrixWithLevelSet")),
+      level_set_correction_(level_set_correction), sph_adaptation_(sph_body_.sph_adaptation_)
 {
-	level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-	particles_->registerVariable(stress_, "ParticleStress", [&](size_t i) -> Matd { return Matd::Identity(); });
-	particles_->addVariableToWrite<Matd>("ParticleStress");
-	particles_->registerVariable(B_, "CorrectionMatrix", [&](size_t i) -> Matd {return Matd::Identity(); });
-	particles_->addVariableToWrite<Matd>("CorrectionMatrix");
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
+}
+ //=================================================================================================//     
+void CorrectedConfigurationInnerWithLevelSet::interaction(size_t index_i, Real dt)
+{
+    Matd local_configuration = Eps * Matd::Identity();
+
+    const Neighborhood &inner_neighborhood = inner_configuration_[index_i];
+    Real phi = level_set_shape_->findSignedDistance(pos_[index_i]);
+    Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
+    for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
+    {
+        Vecd gradW_ij = inner_neighborhood.dW_ijV_j_[n] * inner_neighborhood.e_ij_[n];
+        Vecd r_ji = inner_neighborhood.r_ij_[n] * inner_neighborhood.e_ij_[n];
+        local_configuration -= r_ji * gradW_ij.transpose();
+    }
+
+    if (level_set_correction_)
+    {
+        local_configuration -= level_set_shape_->computeDisplacementKernelGradientIntegral(pos_[index_i],
+                               sph_adaptation_->SmoothingLengthRatio(index_i));
+    }
+    B_with_level_set_[index_i] = local_configuration;
 }
 //=================================================================================================//
-void CalculateParticleStress::interaction(size_t index_i, Real dt)
+void CorrectedConfigurationInnerWithLevelSet::update(size_t index_i, Real dt)
 {
-	Matd particle_stress_ = Matd::Zero();
-	Neighborhood& inner_neighborhood = inner_configuration_[index_i];
-	for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
-	{
-		size_t index_j = inner_neighborhood.j_[n];
-		particle_stress_ -= inner_neighborhood.r_ij_[n] * inner_neighborhood.e_ij_[n] *
-			inner_neighborhood.e_ij_[n].transpose() * inner_neighborhood.dW_ijV_j_[n];
-	}
-
-	if (level_set_correction_)
-	{
-		//The calculation of the particle stress is not related to the level set correction.
-		particle_stress_ -= level_set_shape_->computeDisplacementKernelGradientIntegral(pos_[index_i],
-			                sph_adaptation_->SmoothingLengthRatio(index_i));
-	}
-
-	stress_[index_i] = particle_stress_;
-	B_[index_i] = (Eps * Matd::Identity() + particle_stress_).inverse();
+    B_with_level_set_[index_i] = B_with_level_set_[index_i].inverse();
 }
 //=================================================================================================//
 UpdateParticleKineticEnergy::
@@ -453,8 +552,8 @@ UpdateParticleKineticEnergy(BaseInnerRelation& inner_relation) :
 	LocalDynamics(inner_relation.getSPHBody()), GeneralDataDelegateInner(inner_relation),
 	mass_(particles_->mass_), acc_(particles_->acc_)
 {
-	particles_->registerVariable(particle_kinetic_energy, "particle_kinetic_energy");
-	particles_->addVariableToWrite<Real>("particle_kinetic_energy");
+	particles_->registerVariable(particle_kinetic_energy, "ParticleKineticEnergy");
+	particles_->addVariableToWrite<Real>("ParticleKineticEnergy");
 };
 //=================================================================================================//
 void UpdateParticleKineticEnergy::interaction(size_t index_i, Real dt)
@@ -467,13 +566,14 @@ CheckCorrectedZeroOrderConsistency(BaseInnerRelation& inner_relation, bool level
 	LocalDynamics(inner_relation.getSPHBody()), GeneralDataDelegateInner(inner_relation),
 	level_set_correction_(level_set_correction), pos_(particles_->pos_),
 	B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")),
-	sph_adaptation_(sph_body_.sph_adaptation_)
+	sph_adaptation_(sph_body_.sph_adaptation_),
+    constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
-	level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-	particles_->registerVariable(corrected_zero_order_error_, "corrected_zero_order_error");
-	particles_->addVariableToWrite<Real>("corrected_zero_order_error");
-	particles_->registerVariable(corrected_zero_order_, "corrected_zero_order");
-	particles_->addVariableToWrite<Vecd>("corrected_zero_order");
+	particles_->registerVariable(corrected_zero_order_error_norm_, "CorrectedZeroOrderErrorNorm");
+	particles_->addVariableToWrite<Real>("CorrectedZeroOrderErrorNorm");
+	particles_->registerVariable(corrected_zero_order_error_, "CorrectedZeroOrderError");
+	particles_->addVariableToWrite<Vecd>("CorrectedZeroOrderError");
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
 }
 //=================================================================================================//
 void CheckCorrectedZeroOrderConsistency::interaction(size_t index_i, Real dt)
@@ -486,14 +586,26 @@ void CheckCorrectedZeroOrderConsistency::interaction(size_t index_i, Real dt)
 		acceleration -= 0.5 * (B_[index_i] + B_[index_j]) * inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
 	}
 
-	/*if (level_set_correction_)
+	if (level_set_correction_)
 	{
-		acceleration -= 0.5 * (B_[index_i]  + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
-						pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
-	}*/
+        Real phi = level_set_shape_->findSignedDistance(pos_[index_i]);
+        Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], 
+                       sph_adaptation_->SmoothingLengthRatio(index_i));
 
-	corrected_zero_order_[index_i] = acceleration;
-	corrected_zero_order_error_[index_i] = acceleration.norm();
+        if (phi > -constrained_distance_)
+        {
+            acceleration -= 0.5 * (B_[index_i] + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
+                pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * (1 + overlap);
+        }
+        else
+        {
+            acceleration -= 0.5 * (B_[index_i]  + B_[index_i]) * level_set_shape_->computeKernelGradientIntegral(
+						     pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * (1 + overlap);
+        };
+	}
+
+	corrected_zero_order_error_[index_i] = acceleration;
+	corrected_zero_order_error_norm_[index_i] = acceleration.norm();
 }
 //=================================================================================================//
 CheckCorrectedFirstOrderConsistency::
@@ -501,13 +613,14 @@ CheckCorrectedFirstOrderConsistency(BaseInnerRelation& inner_relation, bool leve
 	LocalDynamics(inner_relation.getSPHBody()), GeneralDataDelegateInner(inner_relation),
 	level_set_correction_(level_set_correction), pos_(particles_->pos_),
 	B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")),
-	sph_adaptation_(sph_body_.sph_adaptation_)
+	sph_adaptation_(sph_body_.sph_adaptation_),
+     constrained_distance_(0.5 * sph_body_.sph_adaptation_->MinimumSpacing())
 {
-	level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-	particles_->registerVariable(corrected_first_order_error_, "corrected_first_order_error");
-	particles_->addVariableToWrite<Real>("corrected_first_order_error");
-	particles_->registerVariable(corrected_first_order_, "corrected_first_order");
-	particles_->addVariableToWrite<Matd>("corrected_first_order");
+	particles_->registerVariable(corrected_first_order_error_norm_, "CorrectedFirstOrderErrorNorm");
+	particles_->addVariableToWrite<Real>("CorrectedFirstOrderErrorNorm");
+	particles_->registerVariable(corrected_first_order_error_, "CorrectedFirstOrderError");
+	particles_->addVariableToWrite<Matd>("CorrectedFirstOrderError");
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
 }
 //=================================================================================================//
 void CheckCorrectedFirstOrderConsistency::interaction(size_t index_i, Real dt)
@@ -521,14 +634,26 @@ void CheckCorrectedFirstOrderConsistency::interaction(size_t index_i, Real dt)
 			inner_neighborhood.e_ij_[n] * (inner_neighborhood.e_ij_[n]).transpose();
 	}
 
-	/*if (level_set_correction_)
+	if (level_set_correction_)
 	{
-		acceleration -= 0.5 * (B_[index_i] + B_[index_i]) * level_set_shape_->computeDisplacementKernelGradientIntegral(
-						pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
-	}*/
+        Real phi = level_set_shape_->findSignedDistance(pos_[index_i]);
+        Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], 
+                       sph_adaptation_->SmoothingLengthRatio(index_i));
 
-	corrected_first_order_[index_i] = acceleration;
-	corrected_first_order_error_[index_i] = (acceleration - Matd::Identity()).norm();
+        if (phi > -constrained_distance_)
+        {
+            acceleration -= 0.5 * (B_[index_i] + B_[index_i]) * level_set_shape_->computeDisplacementKernelGradientIntegral(
+						pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * (1);
+        }
+        else
+        {
+            acceleration -= 0.5 * (B_[index_i] + B_[index_i]) * level_set_shape_->computeDisplacementKernelGradientIntegral(
+						pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i)) * (1);
+        };
+	}
+
+	corrected_first_order_error_[index_i] = acceleration;
+	corrected_first_order_error_norm_[index_i] = (acceleration - Matd::Identity()).norm();
 }
 //=================================================================================================//
 CheckConsistencyRealization::
@@ -539,31 +664,104 @@ CheckConsistencyRealization(BaseInnerRelation& inner_relation, bool level_set_co
     B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")),
     sph_adaptation_(sph_body_.sph_adaptation_)
 {
+
+    particles_->registerVariable(relaxation_error_, "RelaxationErrorNorm");
+    particles_->addVariableToWrite<Real>("RelaxationErrorNorm");
+    particles_->registerVariable(pressure_gradient_error_norm_, "PressureGradientErrorNorm");
+    particles_->addVariableToWrite<Real>("PressureGradientErrorNorm");
+    particles_->registerVariable(pressure_gradient_, "PressureGradient");
+    particles_->addVariableToWrite<Vecd>("PressureGradient");
+    particles_->registerVariable(zero_order_error_norm_, "ZeroOrderErrorNorm");
+    particles_->addVariableToWrite<Real>("ZeroOrderErrorNorm");
+    particles_->registerVariable(zero_order_error_, "ZeroOrderError");
+    particles_->addVariableToWrite<Vecd>("ZeroOrderError");
+    particles_->registerVariable(reproduce_gradient_error_norm_, "ReproduceGradientErrorNorm");
+    particles_->addVariableToWrite<Real>("ReproduceGradientErrorNorm");
+    particles_->registerVariable(reproduce_gradient_, "ReproduceGradient");
+    particles_->addVariableToWrite<Vecd>("ReproduceGradient");
+    particles_->addVariableToWrite<Real>("Pressure");
+
     level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
-    particles_->registerVariable(pressure_gradient_norm_, "pressure_gradient_norm");
-    particles_->addVariableToWrite<Real>("pressure_gradient_norm");
-    particles_->registerVariable(pressure_gradient_, "pressure_gradient");
-    particles_->addVariableToWrite<Vecd>("pressure_gradient");
 }
 //=================================================================================================//
 void CheckConsistencyRealization::interaction(size_t index_i, Real dt)
 {
+    Vecd relaxation_error = Vecd::Zero();
     Vecd pressure_gradient = Vecd::Zero();
+    Vecd zero_order_error = Vecd::Zero();
+    Vecd reproduce_gradient = Vecd::Zero();
     Neighborhood& inner_neighborhood = inner_configuration_[index_i];
     for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
     {
         size_t index_j = inner_neighborhood.j_[n];
-        pressure_gradient += 0.5 * (pressure_[index_i] * B_[index_j] + pressure_[index_j] * B_[index_i]) * inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        relaxation_error += pressure_[index_i] * inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        pressure_gradient += (pressure_[index_i] * B_[index_i] + pressure_[index_j] * B_[index_j]) * 
+                              inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        zero_order_error += pressure_[index_i] * (B_[index_i] + B_[index_j]) *
+                            inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        reproduce_gradient -= (pressure_[index_i] - pressure_[index_j]) * B_[index_j] *
+                               inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
     }
     
-    /*if (level_set_correction_)
+    relaxation_error_[index_i] = relaxation_error.norm();
+    pressure_gradient_[index_i] = pressure_gradient;
+    //pressure_gradient_error_norm_[index_i] = sqrt(pow((pressure_gradient[0] - 1), 2) + pow((pressure_gradient[1] - 0), 2));
+    pressure_gradient_error_norm_[index_i] = sqrt(pow((pressure_gradient[0] - (cos(pos_[index_i][0] * 2 * Pi))), 2) + pow((pressure_gradient[1] - 0), 2));
+    zero_order_error_[index_i] = zero_order_error;
+    zero_order_error_norm_[index_i] = zero_order_error.norm();
+    reproduce_gradient_[index_i] = reproduce_gradient;
+    //reproduce_gradient_error_norm_[index_i] = sqrt(pow((reproduce_gradient[0] - 1), 2) + pow((reproduce_gradient[1] - 0), 2));
+    reproduce_gradient_error_norm_[index_i] = sqrt(pow((reproduce_gradient[0] - (cos(pos_[index_i][0] * 2 * Pi))), 2) + pow((reproduce_gradient[1] - 0), 2));
+}
+//=================================================================================================//
+CheckReverseConsistencyRealization::
+CheckReverseConsistencyRealization(BaseInnerRelation& inner_relation, bool level_set_correction) :
+    LocalDynamics(inner_relation.getSPHBody()), GeneralDataDelegateInner(inner_relation),
+    level_set_correction_(level_set_correction), pos_(particles_->pos_),
+    pressure_(*particles_->template getVariableByName<Real>("Pressure")),
+    B_(*particles_->template getVariableByName<Matd>("CorrectionMatrix")),
+    sph_adaptation_(sph_body_.sph_adaptation_)
+{
+    particles_->registerVariable(pressure_gradient_error_norm_, "PressureGradientErrorNormReverse");
+    particles_->addVariableToWrite<Real>("PressureGradientErrorNormReverse");
+    particles_->registerVariable(pressure_gradient_, "PressureGradientReverse");
+    particles_->addVariableToWrite<Vecd>("PressureGradientReverse");
+    particles_->registerVariable(zero_order_error_norm_, "ZeroOrderErrorNormReverse");
+    particles_->addVariableToWrite<Real>("ZeroOrderErrorNormReverse");
+    particles_->registerVariable(zero_order_error_, "ZeroOrderErrorReverse");
+    particles_->addVariableToWrite<Vecd>("ZeroOrderErrorReverse");
+    particles_->registerVariable(reproduce_gradient_error_norm_, "ReproduceGradientErrorNormReverse");
+    particles_->addVariableToWrite<Real>("ReproduceGradientErrorNormReverse");
+    particles_->registerVariable(reproduce_gradient_, "ReproduceGradientReverse");
+    particles_->addVariableToWrite<Vecd>("ReproduceGradientReverse");
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
+}
+//=================================================================================================//
+void CheckReverseConsistencyRealization::interaction(size_t index_i, Real dt)
+{
+    Neighborhood& inner_neighborhood = inner_configuration_[index_i];
+    Vecd pressure_gradient = Vecd::Zero();
+    Vecd zero_order_error = Vecd::Zero();
+    Vecd reproduce_gradient = Vecd::Zero();
+    for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
     {
-
-    }*/
+        size_t index_j = inner_neighborhood.j_[n];
+        Vecd gradW_ij = inner_neighborhood.dW_ijV_j_[n] * inner_neighborhood.e_ij_[n];
+        pressure_gradient += (pressure_[index_i] * B_[index_j] + pressure_[index_j] * B_[index_i]) * 
+                             inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        zero_order_error += pressure_[index_i] * (B_[index_i] + B_[index_j]) *
+                            inner_neighborhood.e_ij_[n] * inner_neighborhood.dW_ijV_j_[n];
+        reproduce_gradient -= (pressure_[index_i] - pressure_[index_j]) * B_[index_i] * gradW_ij;
+    }
 
     pressure_gradient_[index_i] = pressure_gradient;
-    pressure_gradient_norm_[index_i] = sqrt(pow((pressure_gradient[0] - Pi * (cos(pos_[index_i][0] * 2 * Pi))), 2) + 
-                                            pow((pressure_gradient[1] - Pi * (cos(pos_[index_i][1] * 2 * Pi))), 2));
+    //pressure_gradient_error_norm_[index_i] = sqrt(pow((pressure_gradient[0] - 1), 2) + pow((pressure_gradient[1] - 0), 2));
+    pressure_gradient_error_norm_[index_i] = sqrt(pow((pressure_gradient[0] - (cos(pos_[index_i][0] * 2 * Pi))), 2) + pow((pressure_gradient[1] - 0), 2));
+    zero_order_error_[index_i] = zero_order_error;
+    zero_order_error_norm_[index_i] = zero_order_error.norm();
+    reproduce_gradient_[index_i] = reproduce_gradient;
+    //reproduce_gradient_error_norm_[index_i] = sqrt(pow((reproduce_gradient[0] - 1), 2) + pow((reproduce_gradient[1] - 0), 2));
+    reproduce_gradient_error_norm_[index_i] = sqrt(pow((reproduce_gradient[0] - (cos(pos_[index_i][0] * 2 * Pi))), 2) + pow((reproduce_gradient[1] - 0), 2));
 }
 //=================================================================================================//
 ShellMidSurfaceBounding::
