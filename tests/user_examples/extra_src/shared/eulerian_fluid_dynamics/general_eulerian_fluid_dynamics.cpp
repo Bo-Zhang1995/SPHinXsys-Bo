@@ -1,56 +1,41 @@
-#include "eulerian_fluid_dynamics.h"
+#include "general_eulerian_fluid_dynamics.h"
 
 namespace SPH
 {
 namespace fluid_dynamics
 {
 //=================================================================================================//
-FluidStarState EulerianNoRiemannSolver::getInterfaceState(const FluidState &state_i, const FluidState &state_j, const Vecd &e_ij)
+Vec2d NoRiemannSolverGE::getBoundingWaveSpeeds(const FluidState &state_i, const FluidState &state_j, const Vecd e_ij)
+{
+    Real s_r = 1;
+    Real s_l = -1;
+    return Vec2d(s_l, s_r);
+};
+//=================================================================================================//
+DissipationState NoRiemannSolverGE::getDissipationState(const FluidState &state_i, const FluidState &state_j, const Vecd e_ij)
+{
+    return DissipationState();
+}
+//=================================================================================================//
+Vec2d HLLERiemannSolver::getBoundingWaveSpeeds(const FluidState &state_i, const FluidState &state_j, const Vecd e_ij)
 {
     Real ul = -e_ij.dot(state_i.vel_);
     Real ur = -e_ij.dot(state_j.vel_);
-    Real p_star = (rho0c0_i_ * state_j.p_ + rho0c0_j_ * state_i.p_) * inv_rho0c0_sum_;
-    Real u_star = (rho0c0_i_ * ul + rho0c0_j_ * ur) * inv_rho0c0_sum_;
-    Vecd vel_star = (state_i.vel_ * state_i.rho_ + state_j.vel_ * state_j.rho_) / (state_i.rho_ + state_j.rho_) 
-        - e_ij * (u_star - (ul * state_i.rho_ + ur * state_j.rho_) / (state_i.rho_ + state_j.rho_));
-    FluidStarState interface_state(vel_star, p_star);
-
-    return interface_state;
-}
-//=================================================================================================//
-Real EulerianNoRiemannSolver::DissipativePJump(const Real& u_jump)
-{
-    return 0.0;
+    Real cl = this->fluid_i_.ReferenceSoundSpeed();
+    Real cr = this->fluid_i_.ReferenceSoundSpeed();
+    Real s_l = SMIN(ul - cl, ur - cr);
+    Real s_r = SMAX(ul + cl, ur + cr);
+    return Vec2d(s_l, s_r);
 };
 //=================================================================================================//
-Real EulerianNoRiemannSolver::DissipativeUJump(const Real& p_jump, const Real& u_jump)
-{
-    return 0.0;
-};
-//=================================================================================================//
-FluidStarState EulerianAcousticRiemannSolver::getInterfaceState(const FluidState &state_i, const FluidState &state_j, const Vecd &e_ij)
+DissipationState HLLERiemannSolver::getDissipationState(const FluidState &state_i, const FluidState &state_j, const Vecd e_ij)
 {
     Real ul = -e_ij.dot(state_i.vel_);
     Real ur = -e_ij.dot(state_j.vel_);
-    Real p_star = (rho0c0_i_ * state_j.p_ + rho0c0_j_ * state_i.p_) * inv_rho0c0_sum_ 
-        + 0.5 * rho0c0_geo_ave_ * (ul - ur) * SMIN<Real>(5.0 * SMAX<Real>((ul - ur) * inv_c_ave_, Real(0)), Real(1));
-    Real u_star = (rho0c0_i_ * ul + rho0c0_j_ * ur) * inv_rho0c0_sum_ 
-        + ((state_i.p_ - state_j.p_) * pow(SMIN<Real>(5.0 * SMAX<Real>((ul - ur) * inv_c_ave_, Real(0)), Real(1)), 2)) * inv_rho0c0_sum_;
-    Vecd vel_star = (state_i.vel_ * state_i.rho_ + state_j.vel_ * state_j.rho_) / (state_i.rho_ + state_j.rho_) 
-        - e_ij * (u_star - (ul * state_i.rho_ + ur * state_j.rho_) / (state_i.rho_ + state_j.rho_));
-    FluidStarState interface_state(vel_star, p_star);
-
-    return interface_state;
-}
-//=================================================================================================//
-Real EulerianAcousticRiemannSolver::DissipativePJump(const Real &u_jump)
-{
-    return 0.5 * rho0c0_geo_ave_ * u_jump * SMIN<Real>(5.0 * SMAX<Real>(u_jump * inv_c_ave_, Real(0)), Real(1));
-}
-//=================================================================================================//
-Real EulerianAcousticRiemannSolver::DissipativeUJump(const Real &p_jump, const Real &u_jump)
-{
-    return p_jump * pow(SMIN<Real>(5.0 * SMAX<Real>(u_jump * inv_c_ave_, Real(0)), Real(1)), 2) * inv_rho0c0_sum_;
+    Real clr = (this->fluid_i_.ReferenceSoundSpeed() * state_i.rho_ + this->fluid_i_.ReferenceSoundSpeed() * state_j.rho_) / (state_i.rho_ + state_j.rho_);
+    Matd momentum_dissipation = SMIN<Real>(0.0 * SMAX<Real>((ul - ur) / clr, Real(0)), Real(1)) * (state_j.rho_ * state_j.vel_ - state_i.rho_ * state_i.vel_) * (-e_ij).transpose();
+    Vecd density_dissipation = SMIN<Real>(0.0 * SMAX<Real>((ul - ur) / clr, Real(0)), Real(1)) * (state_j.rho_ - state_i.rho_) * (-e_ij);
+    return DissipationState(momentum_dissipation, density_dissipation);
 };
 //=================================================================================================//
 SmearedSurfaceIndication::SmearedSurfaceIndication(BaseInnerRelation &inner_relation)

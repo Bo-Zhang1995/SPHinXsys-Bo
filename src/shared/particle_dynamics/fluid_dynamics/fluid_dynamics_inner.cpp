@@ -58,7 +58,7 @@ Real AcousticTimeStepSize::outputResult(Real reduced_value)
 {
     // since the particle does not change its configuration in pressure relaxation step
     // I chose a time-step size according to Eulerian method
-    return acousticCFL_ * smoothing_length_min_ / (reduced_value + TinyReal);
+    return acousticCFL_ * smoothing_length_min_ / (reduced_value + TinyReal) / 2;
 }
 //=================================================================================================//
 AdvectionTimeStepSizeForImplicitViscosity::
@@ -106,7 +106,8 @@ BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
       p_(*particles_->getVariableByName<Real>("Pressure")),
       drho_dt_(*particles_->registerSharedVariable<Real>("DensityChangeRate")),
       pos_(particles_->pos_), vel_(particles_->vel_),
-      acc_(particles_->acc_), acc_prior_(particles_->acc_prior_) {}
+      acc_(particles_->acc_), acc_prior_(particles_->acc_prior_),
+      B_(*this->particles_->template registerSharedVariable<Matd>("KernelCorrectionMatrix", Matd::Identity())) {}
 //=================================================================================================//
 Oldroyd_BIntegration1stHalf ::
     Oldroyd_BIntegration1stHalf(BaseInnerRelation &inner_relation)
