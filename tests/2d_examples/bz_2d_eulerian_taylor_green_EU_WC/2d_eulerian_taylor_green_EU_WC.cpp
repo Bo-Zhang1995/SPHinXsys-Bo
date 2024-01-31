@@ -2,9 +2,9 @@
  * @file 	eulerian_taylor_green.cpp
  * @brief 	This is the one of the basic test cases for SPH Eulerian formulation.
  * @details 2D eulerian_taylor_green vortex flow example.
- * @author 	Chi Zhang, Zhentong Wang and Xiangyu Hu
+ * @author 	Bo Zhang and Xiangyu Hu
  */
-#include "general_eulerian_fluid_dynamics.hpp" // eulerian classes for compressible fluid only.
+#include "general_eulerian_fluid_dynamics.hpp" // eulerian classes for fluid.
 #include "sphinxsys.h"
 using namespace SPH;
 //----------------------------------------------------------------------
@@ -12,7 +12,7 @@ using namespace SPH;
 //----------------------------------------------------------------------
 Real DL = 1.0;                    /**< box length. */
 Real DH = 1.0;                    /**< box height. */
-Real resolution_ref = 1.0 / 25.0; /**< Global reference resolution. */
+Real resolution_ref = 1.0 / 50.0; /**< Global reference resolution. */
 /** Domain bounds of the system. */
 BoundingBox system_domain_bounds(Vec2d::Zero(), Vec2d(DL, DH));
 //----------------------------------------------------------------------
@@ -80,8 +80,8 @@ int main(int ac, char *av[])
     //	Build up the environment of a SPHSystem.
     //----------------------------------------------------------------------
     SPHSystem sph_system(system_domain_bounds, resolution_ref);
-    sph_system.setRunParticleRelaxation(false); //Tag for run particle relaxation for body-fitted distribution
-    sph_system.setReloadParticles(true);       //Tag for computation with save particles distribution
+    sph_system.setRunParticleRelaxation(true); 
+    sph_system.setReloadParticles(true);
 #ifdef BOOST_AVAILABLE
     sph_system.handleCommandlineOptions(ac, av);// handle command line arguemnts.
 #endif
@@ -93,6 +93,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     FluidBody water_body(sph_system, makeShared<WaterBlock>("WaterBody"));
     water_body.defineBodyLevelSetShape()->writeLevelSet(io_environment);
+    water_body.defineAdaptationRatios(1.3, 1.0);
     water_body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f, mu_f);
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
         ? water_body.generateParticles<ParticleGeneratorReload>(io_environment, water_body.getName())
@@ -112,65 +113,80 @@ int main(int ac, char *av[])
         /** Random reset the insert body particle position. */
         SimpleDynamics<RandomizeParticlePosition> random_water_body_particles(water_body);
         /** Write the body state to Vtp file. */
-        BodyStatesRecordingToVtp write_water_body_to_vtp(io_environment, { &water_body });
+        BodyStatesRecordingToPlt write_water_body_to_vtp(io_environment, { &water_body });
         /** Write the particle reload files. */
         ReloadParticleIO write_particle_reload_files(io_environment, { &water_body });
 
         /* Relaxation method: including based on the 0th and 1st order consistency. */
         InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_inner(water_body_inner);
-        relax_dynamics::RelaxationStepInnerImplicit relaxation_step_inner(water_body_inner);
-
+        //relax_dynamics::RelaxationStepInnerImplicit relaxation_step_inner(water_body_inner);
+        relax_dynamics::RelaxationStepInnerImplicit<CorrectionMatrixRelaxation> relaxation_step_inner(water_body_inner);
+        SimpleDynamics<relax_dynamics::UpdateParticleKineticEnergy> update_water_block_kinetic_energy(water_body_inner);
         PeriodicConditionUsingCellLinkedList periodic_condition_x(water_body, water_body.getBodyShapeBounds(), xAxis);
         PeriodicConditionUsingCellLinkedList periodic_condition_y(water_body, water_body.getBodyShapeBounds(), yAxis);
+        ReduceDynamics<Average<QuantitySummation<Real>>> calculate_water_block_average_kinetic_energy(water_body, "ParticleKineticEnergy");
+        ReduceDynamics<QuantityMaximum<Real>> calculate_water_block_maximum_kinetic_energy(water_body, "ParticleKineticEnergy"); 
+        water_body.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
         //----------------------------------------------------------------------  
         //	Particle relaxation starts here.
         //----------------------------------------------------------------------
-        random_water_body_particles.exec(0.15);
+        random_water_body_particles.exec(0.25);
         sph_system.initializeSystemCellLinkedLists();
         periodic_condition_x.update_cell_linked_list_.exec();
         periodic_condition_y.update_cell_linked_list_.exec();
         sph_system.initializeSystemConfigurations();
         write_water_body_to_vtp.writeToFile(0);
-
+        Real water_block_average_energy = 100.0;
+        Real water_block_maximum_energy = 100.0;
+        Real last_water_block_maximum_energy = 100.0;
+        Real dt = 1;
         //----------------------------------------------------------------------
         //	Relax particles of the insert body.
         //----------------------------------------------------------------------
         TickCount t1 = TickCount::now();
-
-        int ite = 0; //iteration step for the total relaxation step.
-
-        Real last_zero_maximum_residual = 1;
-        Real last_zero_average_residual = 1;
-        Real last_first_maximum_residual = 1;
-        Real last_first_average_residual = 1;
-
-        Real current_zero_maximum_residual = 1;
-        Real current_zero_average_residual = 1;
-        Real current_first_maximum_residaul = 1;
-        Real current_first_average_residaul = 1;
-
+        int ite = 0;
         GlobalStaticVariables::physical_time_ = ite;
-        /* The procedure to obtain uniform particle distribution that satisfies the 0ht order consistency. */
-        while (current_zero_maximum_residual > 0.0001)
+       
+        while (water_block_maximum_energy > 1e-5)
         {
+            kernel_correction_inner.exec();
+            relaxation_step_inner.exec(dt);
             periodic_condition_x.bounding_.exec();
             periodic_condition_y.bounding_.exec();
             water_body.updateCellLinkedList();
             periodic_condition_x.update_cell_linked_list_.exec();
             periodic_condition_y.update_cell_linked_list_.exec();
             water_body_inner.updateConfiguration();
-
-
+            
             ite++;
-
-            if (ite % 100 == 0)
+            if (ite % 200 == 0)
             {
-                std::cout << std::fixed << std::setprecision(9) << "The 0th relaxation steps for the body N = " << ite << "\n";
-                std::cout << "The 0th consistency error: maximum = " << current_zero_maximum_residual << ": average = " << current_zero_average_residual << std::endl;
+                update_water_block_kinetic_energy.exec();
+                water_block_average_energy = calculate_water_block_average_kinetic_energy.exec();
+                water_block_maximum_energy = calculate_water_block_maximum_kinetic_energy.exec();
+                std::cout << std::fixed << std::setprecision(9) << "Relaxation steps N = " << ite << "\n";
+                std::cout << "Residual: "
+                    << " maximum: " << water_block_maximum_energy
+                    << " average: " << water_block_average_energy << std::endl;
+                std::cout << "Last maximum residual is " << last_water_block_maximum_energy << std::endl;
+
+                if (water_block_maximum_energy > last_water_block_maximum_energy)
+                {
+                    dt = 0.99 * dt;
+                }
+                else if (water_block_maximum_energy < last_water_block_maximum_energy)
+                {
+                    dt = 1.01 * dt;
+                }
+                last_water_block_maximum_energy = water_block_maximum_energy;
+                std::cout << "dt ratio is " << dt << std::endl;
                 write_water_body_to_vtp.writeToFile(ite);
             }
         }
-        std::cout << "The 0th consistency error: maximum = " << current_zero_maximum_residual << ": average = " << current_zero_average_residual << std::endl;
+
+        std::cout << "Residual: "
+                  << " maximum: " << calculate_water_block_maximum_kinetic_energy.exec()
+                  << " average: " << calculate_water_block_average_kinetic_energy.exec() << std::endl;
 
         ite++;
         write_water_body_to_vtp.writeToFile(ite);
@@ -188,22 +204,22 @@ int main(int ac, char *av[])
     //	Basically the the range of bodies to build neighbor particle lists.
     //----------------------------------------------------------------------
     InnerRelation water_body_inner(water_body);
-    InnerRelation water_body_correct_inner(water_body);
+    InnerRelation water_body_inner_corrected(water_body);
     //----------------------------------------------------------------------
     //	Define the main numerical methods used in the simulation.
     //	Note that there may be data dependence on the constructors of these methods.
     //----------------------------------------------------------------------
-    InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfHLLERiemann> pressure_relaxation(water_body_inner);
-    InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfHLLERiemann> density_and_energy_relaxation(water_body_inner);
+    InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfNoRiemann> pressure_relaxation(water_body_inner);
+    InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfNoRiemann> density_and_energy_relaxation(water_body_inner);
     SimpleDynamics<TaylorGreenInitialCondition> initial_condition(water_body);
     SimpleDynamics<TimeStepInitialization> time_step_initialization(water_body);
     PeriodicConditionUsingCellLinkedList periodic_condition_x(water_body, water_body.getBodyShapeBounds(), xAxis);
     PeriodicConditionUsingCellLinkedList periodic_condition_y(water_body, water_body.getBodyShapeBounds(), yAxis);
     ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_body);
-    InteractionDynamics<fluid_dynamics::ViscousAccelerationInner> viscous_acceleration(water_body_correct_inner);
+    InteractionDynamics<fluid_dynamics::ViscousAccelerationInner> viscous_acceleration(water_body_inner_corrected);
     InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_matrix(water_body_inner);
-    InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_matrix_eu(water_body_correct_inner);
-    InteractionDynamics<KernelGradientCorrectionInner> kernel_gradient_update(kernel_correction_matrix_eu);
+    InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_matrix_corrected(water_body_inner_corrected);
+    InteractionDynamics<KernelGradientCorrectionInner> kernel_gradient_update(kernel_correction_matrix_corrected);
     water_body.addBodyStateForRecording<Real>("Pressure");
     water_body.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
     //----------------------------------------------------------------------
@@ -227,7 +243,7 @@ int main(int ac, char *av[])
     sph_system.initializeSystemConfigurations();
     initial_condition.exec();
     kernel_correction_matrix.exec();
-    kernel_correction_matrix_eu.exec();
+    kernel_correction_matrix_corrected.exec();
     kernel_gradient_update.exec();
     //----------------------------------------------------------------------
     //	Setup for time-stepping control
@@ -246,6 +262,7 @@ int main(int ac, char *av[])
     body_states_recording.writeToFile();
     /** Output the mechanical energy of fluid. */
     write_total_mechanical_energy.writeToFile();
+    write_maximum_speed.writeToFile();
     //----------------------------------------------------------------------
     //	Main loop starts here.
     //----------------------------------------------------------------------
@@ -287,9 +304,6 @@ int main(int ac, char *av[])
     tt = t4 - t1 - interval;
     std::cout << "Total wall time for computation: " << tt.seconds()
               << " seconds." << std::endl;
-
-    write_total_mechanical_energy.testResult();
-    write_maximum_speed.testResult();
 
     return 0;
 }

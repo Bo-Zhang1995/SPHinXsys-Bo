@@ -7,14 +7,14 @@ sys.path.append(path)
 from regression_test_base_tool import SphinxsysRegressionTest
 
 """
-case name: test_2d_eulerian_taylor_green
+case name: test_2d_dambreak
 """
 
-case_name = "test_2d_eulerian_taylor_green"
+case_name = "test_2d_dambreak"
 body_name = "WaterBody"
 parameter_name = "TotalMechanicalEnergy"
-body_name_1 = "WaterBody"
-parameter_name_1 = "MaximumSpeed"
+body_name_1 = "FluidObserver"
+parameter_name_1 = "Pressure"
 
 number_of_run_times = 0
 converged = 0

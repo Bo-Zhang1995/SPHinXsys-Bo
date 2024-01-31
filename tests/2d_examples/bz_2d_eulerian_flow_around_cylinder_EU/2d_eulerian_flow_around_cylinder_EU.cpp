@@ -163,7 +163,6 @@ int main(int ac, char *av[])
             ite_p += 1;
             if (ite_p % 200 == 0)
             {
-                update_water_block_kinetic_energy.exec();
                 update_cylinder_kietic_energy.exec();
                 water_block_kinetic_energy = calculate_water_block_maximum_kinetic_energy.exec();
                 cylinder_kinetic_energy = calculate_cylinder_maximum_kinetic_energy.exec();
@@ -188,10 +187,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	Define the main numerical methods used in the simulation.
     //	Note that there may be data dependence on the constructors of these methods.
-    //----------------------------------------------------------------------
-    //InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfNoRiemannWithWall> pressure_relaxation(water_block_complex);
-    //InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfNoRiemannWithWall> density_relaxation(water_block_complex);
-    
+    //----------------------------------------------------------------------    
     InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfNoRiemannWithWall> pressure_relaxation(water_block_complex_correction);
     InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfNoRiemannWithWall> density_relaxation(water_block_complex_correction);
     InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_matrix_correction(water_block_complex_correction);
