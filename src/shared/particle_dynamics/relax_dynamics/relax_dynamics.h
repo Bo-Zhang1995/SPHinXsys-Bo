@@ -41,10 +41,10 @@ namespace SPH
 class GeometryShape;
 class LevelSetShape;
 
-class PressureRelaxation
+class PressureRelaxation //identification class for pressure relaxation.
 {
-  public:
-    PressureRelaxation(){};
+public:
+    PressureRelaxation() {};
 
     Real getBackgroundForce(Matd Bi, Matd Bj)
     {
@@ -52,15 +52,15 @@ class PressureRelaxation
     };
 };
 
-class CorrectionMatrixRelaxation
+class CorrectionMatrixRelaxation //identification class for correction matrix relaxation.
 {
-  public:
-    CorrectionMatrixRelaxation(){};
+public:
+    CorrectionMatrixRelaxation() {};
 
     Matd getBackgroundForce(Matd Bi, Matd Bj)
     {
         return (Bi + Bj);
-    };
+    }
 };
 
 namespace relax_dynamics
@@ -144,7 +144,7 @@ class RelaxationAccelerationInnerWithLevelSetCorrection : public RelaxationAccel
         /* A scaling is adopted to handle the particle overlap. */
         this->acc_[index_i] -= this->relaxation_type.getBackgroundForce(this->B_[index_i], this->B_[index_i]) * 
                          level_set_shape_->computeKernelGradientIntegral(this->pos_[index_i],
-                         sph_adaptation_->SmoothingLengthRatio(index_i));
+                         sph_adaptation_->SmoothingLengthRatio(index_i)) * (1 + overlap);
     };
 
   protected:
@@ -306,8 +306,8 @@ class RelaxationAccelerationComplexWithLevelSetCorrection : public RelaxationAcc
                        sph_adaptation_->SmoothingLengthRatio(index_i));
 
         this->acc_[index_i] -= this->relaxation_type.getBackgroundForce(this->B_[index_i], this->B_[index_i]) *
-                               level_set_shape_->computeKernelGradientIntegral(this->pos_[index_i],
-                               sph_adaptation_->SmoothingLengthRatio(index_i));
+            level_set_shape_->computeKernelGradientIntegral(this->pos_[index_i],
+                sph_adaptation_->SmoothingLengthRatio(index_i)) * (1 + overlap);
     };
 
   protected:

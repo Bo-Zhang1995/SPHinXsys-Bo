@@ -108,7 +108,7 @@ void RelaxationStepComplex<RelaxationType>::exec(Real dt)
     relaxation_acceleration_complex_->exec();
     Real dt_square = get_time_step_square_.exec();
     update_particle_position_.exec(dt_square);
-    //surface_bounding_.exec();
+    surface_bounding_.exec();
 }
 //=================================================================================================//
 template <class RelaxationType>
