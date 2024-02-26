@@ -379,7 +379,7 @@ protected:
 };
 
 /**
- * @class RelaxationByCMImplicitInnerWithLevelSetCorrection
+ * @class RelaxationInnerWithLevelSetCorrectionImplicit
  * @brief we constrain particles to a level function representing the interface.
  */
 template <class RelaxationType = PressureRelaxation>
@@ -414,6 +414,7 @@ protected:
     NearShapeSurface near_shape_surface_;
     ReduceDynamics<GetTimeStepSizeSquare> get_time_step_;
     InteractionSplit<RelaxationInnerWithLevelSetCorrectionImplicit<RelaxationType>> relaxation_evolution_inner_;
+    //InteractionSplit<RelaxationInnerImplicit<RelaxationType>> relaxation_evolution_inner_;
     SimpleDynamics<ShapeSurfaceBounding> surface_bounding_;
 };
 
@@ -446,7 +447,7 @@ protected:
 };
 
 /**
- * @class RelaxationByCMImplicitInnerWithLevelSetCorrection
+ * @class RelaxationComplexWithLevelSetCorrectionImplicit
  * @brief we constrain particles to a level function representing the interface.
  */
 template <class RelaxationType = PressureRelaxation>
