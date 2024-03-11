@@ -51,7 +51,8 @@ KernelCorrectionMatrixInnerWithLevelSet::KernelCorrectionMatrixInnerWithLevelSet
 void KernelCorrectionMatrixInnerWithLevelSet::interaction(size_t index_i, Real dt)
 {
     KernelCorrectionMatrixInner::interaction(index_i, dt);
-    Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], sph_adaptation_->SmoothingLengthRatio(index_i));
+    Real overlap = level_set_shape_->computeKernelIntegral(pos_[index_i], 
+        sph_adaptation_->SmoothingLengthRatio(index_i));
     B_[index_i] -= level_set_shape_->computeDisplacementKernelGradientIntegral(pos_[index_i],
         sph_adaptation_->SmoothingLengthRatio(index_i)) * (1 + overlap);
 }
