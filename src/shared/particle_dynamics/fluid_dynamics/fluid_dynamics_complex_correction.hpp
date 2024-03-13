@@ -51,7 +51,6 @@ void BaseIntegration1stHalfConsistencyWithWall<BaseIntegration1stHalfConsistency
     for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
     {
         StdLargeVec<Vecd>& acc_ave_k = *(this->wall_acc_ave_[k]);
-        StdLargeVec<Matd>& wall_B_k = *(this->wall_B_[k]);
         Neighborhood& wall_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
         for (size_t n = 0; n != wall_neighborhood.current_size_; ++n)
         {
@@ -61,13 +60,14 @@ void BaseIntegration1stHalfConsistencyWithWall<BaseIntegration1stHalfConsistency
             Real r_ij = wall_neighborhood.r_ij_[n];
 
             Real face_wall_external_acceleration = (acc_prior_i - acc_ave_k[index_j]).dot(-e_ij);
-            Real p_in_wall = this->p_[index_i] + this->rho_[index_i] * r_ij * SMAX(Real(0), face_wall_external_acceleration);
-            acceleration -= (this->p_[index_i] + p_in_wall) * this->B_[index_i] * e_ij * dW_ijV_j;
+            Real p_in_wall = this->p_[index_i] + this->mass_[index_i] / this->Vol_[index_i] * r_ij * SMAX(Real(0), face_wall_external_acceleration);
+
+            acceleration -= (this->p_[index_i] + p_in_wall) * this->B_[index_i] * dW_ijV_j * e_ij;
             rho_dissipation += this->riemann_solver_.DissipativeUJump(this->p_[index_i] - p_in_wall) * dW_ijV_j;
         }
     }
-    this->acc_[index_i] += acceleration / this->rho_[index_i];
-    this->drho_dt_[index_i] += rho_dissipation * this->rho_[index_i];
+    this->acc_[index_i] += acceleration * this->Vol_[index_i] / this->mass_[index_i];
+    this->drho_dt_[index_i] += rho_dissipation * this->mass_[index_i] / this->Vol_[index_i];
 }
 //=================================================================================================//
 } // namespace fluid_dynamics

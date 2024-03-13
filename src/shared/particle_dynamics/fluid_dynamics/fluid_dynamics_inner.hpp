@@ -217,6 +217,7 @@ template <class RiemannSolverType>
 void BaseIntegration2ndHalf<RiemannSolverType>::update(size_t index_i, Real dt)
 {
     rho_[index_i] += drho_dt_[index_i] * dt * 0.5;
+    /* The volume is not updated here. */
     Vol_[index_i] = mass_[index_i] / rho_[index_i];
 }
 //=================================================================================================//

@@ -68,7 +68,7 @@ class BaseDensitySummationInner : public LocalDynamics, public FluidDataInner
     void update(size_t index_i, Real dt = 0.0);
 
   protected:
-    StdLargeVec<Real> &rho_, rho_sum_, &mass_;
+    StdLargeVec<Real> &rho_, rho_sum_, &mass_, &Vol_;
     Real rho0_, inv_sigma0_;
 };
 
@@ -237,7 +237,7 @@ class BaseIntegration : public LocalDynamics, public FluidDataInner
 
   protected:
     Fluid &fluid_;
-    StdLargeVec<Real> &rho_, &p_, &drho_dt_;
+    StdLargeVec<Real> &rho_, &p_, &drho_dt_, &Vol_, &mass_;
     StdLargeVec<Vecd> &pos_, &vel_, &acc_, &acc_prior_;
     StdLargeVec<Matd>& B_;
 
