@@ -257,7 +257,7 @@ public:
                     Vecd nablaW_ijV_j = contact_neighborhood.dW_ijV_j_[n] * contact_neighborhood.e_ij_[n];
 
                     // acceleration for transport velocity
-                    acceleration_trans -= (this->B_[index_i] + this->B_[index_i]) * nablaW_ijV_j;
+                    acceleration_trans -= (this->B_[index_i] + wall_B_k[index_j]) * nablaW_ijV_j;
                 }
             }
 
@@ -386,7 +386,7 @@ public:
                     this->kernel_->d2W(contact_neighborhood.r_ij_[n], contact_neighborhood.e_ij_[n]) *
                     Vol_k[index_j] * dt * dt;
 
-                error_and_parameters.error_ += (this->B_[index_i] + this->B_[index_i]) *
+                error_and_parameters.error_ += (this->B_[index_i] + B_k[index_j]) *
                                                 contact_neighborhood.dW_ijV_j_[n] * contact_neighborhood.e_ij_[n] * dt * dt;
                 error_and_parameters.a_ -= parameter_b;
             }

@@ -12,7 +12,7 @@ using namespace SPH;
 //----------------------------------------------------------------------
 Real DL = 1.0;					   /**< box length. */
 Real DH = 1.0;					   /**< box height. */
-Real resolution_ref = 1.0 / 400.0; /**< Global reference resolution. */
+Real resolution_ref = 1.0 / 200.0; /**< Global reference resolution. */
 Real BW = resolution_ref * 6;	   /**< Extending width for BCs. */
 /** Domain bounds of the system. */
 BoundingBox system_domain_bounds(Vec2d(-BW, -BW), Vec2d(DL + BW, DH + BW));
@@ -22,7 +22,7 @@ BoundingBox system_domain_bounds(Vec2d(-BW, -BW), Vec2d(DL + BW, DH + BW));
 Real rho0_f = 1.0;					/**< Reference density of fluid. */
 Real U_f = 1.0;						/**< Characteristic velocity. */
 Real c_f = 10.0 * U_f;				/**< Reference sound speed. */
-Real Re = 10000.0;						/**< Reynolds number. */
+Real Re = 1000.0;						/**< Reynolds number. */
 Real mu_f = rho0_f * U_f * DL / Re; /**< Dynamics viscosity. */
 //----------------------------------------------------------------------
 //	Cases-dependent geometries
@@ -158,7 +158,7 @@ int main(int ac, char *av[])
 	//----------------------------------------------------------------------
 	FluidBody water_body(sph_system, makeShared<WaterBlock>("WaterBody"));
 	water_body.defineComponentLevelSetShape("InnerWaterBlock")->writeLevelSet(io_environment);
-	water_body.defineAdaptationRatios(0.945, 1.0);
+	water_body.defineAdaptationRatios(1.15, 1.0);
 	water_body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f, mu_f);
 	(!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
 		? water_body.generateParticles<ParticleGeneratorReload>(io_environment, water_body.getName())
@@ -168,7 +168,7 @@ int main(int ac, char *av[])
 	 * @brief 	Particle and body creation of wall boundary.
 	 */
 	SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("Wall"));
-	water_body.defineAdaptationRatios(0.945, 1.0);
+	water_body.defineAdaptationRatios(1.15, 1.0);
 	wall_boundary.defineParticlesAndMaterial<SolidParticles, Solid>();
 	wall_boundary.generateParticles<ParticleGeneratorLattice>();
 	wall_boundary.addBodyStateForRecording<Vecd>("NormalDirection");
@@ -318,7 +318,7 @@ int main(int ac, char *av[])
 	size_t number_of_iterations = 0;
 	int screen_output_interval = 100;
 	int restart_output_interval = screen_output_interval * 10;
-	Real End_Time = 200.0; /**< End time. */
+	Real End_Time = 40.0; /**< End time. */
 	Real D_Time = 1.0;	 /**< Time stamps for output of body states. */
 	/** statistics for computing CPU time. */
 	TickCount t1 = TickCount::now();

@@ -14,7 +14,7 @@ Real DW = 0.15;                 // tank width
 Real LL = 0.6;                  // liquid length
 Real LH = 0.3;                  // liquid height
 Real LW = 0.15;                 // liquid width
-Real resolution_ref = LH / 40 ; // particle spacing
+Real resolution_ref = LH / 80 ; // particle spacing
 Real BW = resolution_ref * 4;   // boundary width
 
 // for material properties of the fluid
@@ -63,7 +63,7 @@ class WaterObserverParticleGenerator : public ObserverParticleGenerator
 };
 
 //WaveGauges 
-Real h = 1.3 * resolution_ref;
+Real h = 1.15 * resolution_ref;
 Vecd halfsize_No1(h, 0.3, h);
 Vecd translation_No1(1.310, 0.3, 0.0);
 Vecd halfsize_No2(h, 0.3, h);
@@ -85,6 +85,7 @@ int main(int ac, char *av[])
     //	Creating bodies with corresponding materials and particles.
     //----------------------------------------------------------------------
     FluidBody water_block(sph_system, makeShared<WaterBlock>("WaterBody"));
+    water_block.defineAdaptationRatios(1.15, 1.0);
     water_block.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f);
     water_block.generateParticles<ParticleGeneratorLattice>();
     water_block.addBodyStateForRecording<Real>("Pressure");
@@ -111,10 +112,10 @@ int main(int ac, char *av[])
     //	Note that there may be data dependence on the sequence of constructions.
     //----------------------------------------------------------------------
     SharedPtr<Gravity> gravity_ptr = makeShared<Gravity>(Vec3d(0.0, -gravity_g, 0.0));
-    //InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_matrix(water_block_complex, 0.5);
+    InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_matrix(water_block_complex, 0.5);
     SimpleDynamics<TimeStepInitialization> initialize_a_fluid_step(water_block, gravity_ptr);
-    Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannWithWall> pressure_relaxation(water_block_complex);
-    //Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannConsistencyWithWall> pressure_relaxation(water_block_complex);
+    //Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannWithWall> pressure_relaxation(water_block_complex);
+    Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannConsistencyWithWall> pressure_relaxation(water_block_complex);
     Dynamics1Level<fluid_dynamics::Integration2ndHalfRiemannWithWall> density_relaxation(water_block_complex);
     InteractionWithUpdate<fluid_dynamics::DensitySummationFreeSurfaceComplex> update_density_by_summation(water_block_complex);
     ReduceDynamics<fluid_dynamics::AdvectionTimeStepSize> get_fluid_advection_time_step_size(water_block, U_f);
@@ -153,7 +154,7 @@ int main(int ac, char *av[])
     sph_system.initializeSystemCellLinkedLists();
     sph_system.initializeSystemConfigurations();
     wall_boundary_normal_direction.exec();
-    //kernel_correction_matrix.exec();
+    kernel_correction_matrix.exec();
     //----------------------------------------------------------------------
     //	Setup for time-stepping control
     //----------------------------------------------------------------------
@@ -183,7 +184,7 @@ int main(int ac, char *av[])
             initialize_a_fluid_step.exec();
             Real Dt = get_fluid_advection_time_step_size.exec();
             update_density_by_summation.exec();
-            //kernel_correction_matrix.exec();
+            kernel_correction_matrix.exec();
 
             Real relaxation_time = 0.0;
             while (relaxation_time < Dt)

@@ -28,7 +28,8 @@
 
 #ifndef COMMON_COMPRESSIBLE_FVM_CLASSES_H
 #define COMMON_COMPRESSIBLE_FVM_CLASSES_H
-#include "common_compressible_eulerian_classes.hpp"
+//#include "common_compressible_eulerian_classes.hpp"
+#include "general_compressible_eulerian_fluid_dynamics.h"
 #include "common_shared_FVM_classes.h"
 namespace SPH
 {

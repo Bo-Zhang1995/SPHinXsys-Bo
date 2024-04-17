@@ -4,7 +4,8 @@
  * @details 2D eulerian_taylor_green vortex flow example.
  * @author 	Chi Zhang, Zhentong Wang and Xiangyu Hu
  */
-#include "common_compressible_eulerian_classes.hpp" // eulerian classes for compressible fluid only.
+//#include "common_compressible_eulerian_classes.hpp" // eulerian classes for compressible fluid only.
+#include "general_compressible_eulerian_fluid_dynamics.hpp"
 #include "sphinxsys.h"
 using namespace SPH; //	Namespace cite here.
 //----------------------------------------------------------------------
@@ -98,7 +99,7 @@ int main(int ac, char *av[])
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
     FluidBody water_body(sph_system, makeShared<WaterBlock>("WaterBody"));
-    water_body.sph_adaptation_->resetKernel<KernelTabulated<KernelLaguerreGauss>>(20);
+    //water_body.sph_adaptation_->resetKernel<KernelTabulated<KernelLaguerreGauss>>(20);
     water_body.defineParticlesAndMaterial<BaseParticles, CompressibleFluid>(rho0_f, heat_capacity_ratio, mu_f);
     water_body.generateParticles<ParticleGeneratorLattice>();
     //----------------------------------------------------------------------
@@ -110,20 +111,22 @@ int main(int ac, char *av[])
     //  inner and contact relations.
     //----------------------------------------------------------------------
     InnerRelation water_body_inner(water_body);
+    InnerRelation water_body_inner_correct(water_body);
     //----------------------------------------------------------------------
     //	Define the main numerical methods used in the simulation.
     //	Note that there may be data dependence on the constructors of these methods.
     //----------------------------------------------------------------------
     SimpleDynamics<TaylorGreenInitialCondition> initial_condition(water_body);
-    SimpleDynamics<EulerianCompressibleTimeStepInitialization> time_step_initialization(water_body);
+    SimpleDynamics<EulerianCETimeStepInitialization> time_step_initialization(water_body);
     PeriodicConditionUsingCellLinkedList periodic_condition_x(water_body, water_body.getBodyShapeBounds(), xAxis);
     PeriodicConditionUsingCellLinkedList periodic_condition_y(water_body, water_body.getBodyShapeBounds(), yAxis);
-    ReduceDynamics<EulerianCompressibleAcousticTimeStepSize> get_fluid_time_step_size(water_body);
-    InteractionWithUpdate<Integration1stHalfHLLCWithLimiterRiemann> pressure_relaxation(water_body_inner);
-    InteractionWithUpdate<Integration2ndHalfHLLCWithLimiterRiemann> density_and_energy_relaxation(water_body_inner);
-    InteractionDynamics<EulerianCompressibleViscousAccelerationInner> viscous_acceleration(water_body_inner);
+    ReduceDynamics<EulerianCEAcousticTimeStepSize> get_fluid_time_step_size(water_body);
+    InteractionWithUpdate<CEIntegration1stHalfHLLERiemann> pressure_relaxation(water_body_inner);
+    InteractionWithUpdate<CEIntegration2ndHalfHLLERiemann> density_and_energy_relaxation(water_body_inner);
+    InteractionDynamics<EulerianCEViscousAccelerationInner> viscous_acceleration(water_body_inner_correct);
     InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_matrix(water_body_inner);
-    InteractionDynamics<KernelGradientCorrectionInner> kernel_gradient_update(kernel_correction_matrix);
+    InteractionWithUpdate<KernelCorrectionMatrixInner> kernel_correction_matrix_correction(water_body_inner_correct);
+    InteractionDynamics<KernelGradientCorrectionInner> kernel_gradient_update(kernel_correction_matrix_correction);
     //----------------------------------------------------------------------
     //	Define the methods for I/O operations and observations of the simulation.
     //----------------------------------------------------------------------
@@ -142,6 +145,7 @@ int main(int ac, char *av[])
     sph_system.initializeSystemConfigurations();
     initial_condition.exec();
     kernel_correction_matrix.exec();
+    kernel_correction_matrix_correction.exec();
     kernel_gradient_update.exec();
     //----------------------------------------------------------------------
     //	Setup for time-stepping control

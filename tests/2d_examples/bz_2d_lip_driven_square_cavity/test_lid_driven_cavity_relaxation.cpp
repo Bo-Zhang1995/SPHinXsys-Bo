@@ -39,7 +39,6 @@ public:
 		water_body_shape.push_back(Vecd(DL, 0.0));
 		water_body_shape.push_back(Vecd(0.0, 0.0));
 		multi_polygon_.addAPolygon(water_body_shape, ShapeBooleanOps::add);
-
 	}
 };
 /**
@@ -149,7 +148,7 @@ int main(int ac, char *av[])
 	//----------------------------------------------------------------------
 	FluidBody water_body(sph_system, makeShared<WaterBlock>("WaterBody"));
 	water_body.defineBodyLevelSetShape();
-	water_body.defineAdaptationRatios(1.15, 1.0);
+	water_body.defineAdaptationRatios(1.3, 1.0);
 	water_body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f, mu_f);
 	(!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
 		? water_body.generateParticles<ParticleGeneratorReload>(io_environment, water_body.getName())
@@ -158,7 +157,7 @@ int main(int ac, char *av[])
 	water_body.addBodyStateForRecording<Real>("Pressure");
 
 	SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("Wall"));
-	wall_boundary.defineAdaptationRatios(1.15, 1.0);
+	wall_boundary.defineAdaptationRatios(1.3, 1.0);
 	wall_boundary.defineParticlesAndMaterial<SolidParticles, Solid>();
 	wall_boundary.generateParticles<ParticleGeneratorLattice>();
 	wall_boundary.addBodyStateForRecording<Vecd>("NormalDirection");
@@ -239,9 +238,9 @@ int main(int ac, char *av[])
 	/** Kernel correction matrix and transport velocity formulation. */
 	InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_complex(water_block_complex);
 	InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_wall(wall_boundary_complex);
-	InteractionDynamics<fluid_dynamics::TransportVelocityCorrectionComplex<AllParticles>> transport_velocity_correction(water_block_complex);
-	InteractionDynamics<fluid_dynamics::TransportVelocityConsistencyComplex<AllParticles>> transport_velocity_consistency(water_block_complex, 0.225);
-	InteractionDynamics<fluid_dynamics::TransportVelocityConsistencyComplexImplicit<AllParticles>> transport_velocity_consistency_implicit(water_block_complex, 10);
+	InteractionDynamics<fluid_dynamics::TransportVelocityCorrectionComplex<AllParticles>> transport_velocity_correction(water_block_complex, 0.1);
+	InteractionDynamics<fluid_dynamics::TransportVelocityConsistencyComplex<AllParticles>> transport_velocity_consistency(water_block_complex, 0.1);
+	InteractionDynamics<fluid_dynamics::TransportVelocityConsistencyComplexImplicit<AllParticles>> transport_velocity_consistency_implicit(water_block_complex, 0.25);
 	/** Time step size with considering sound wave speed. */
 	ReduceDynamics<fluid_dynamics::AdvectionTimeStepSize> get_fluid_advection_time_step_size(water_body, U_f);
 	ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_body);
@@ -272,7 +271,7 @@ int main(int ac, char *av[])
 	//----------------------------------------------------------------------
 	size_t number_of_iterations = 0;
 	int screen_output_interval = 100;
-	Real End_Time = 50.0; /**< End time. */
+	Real End_Time = 100.0; /**< End time. */
 	Real output_interval = 0.1;
 	Real dt = 1.0;	      /**< Time stamps for output of body states. */
 	//----------------------------------------------------------------------

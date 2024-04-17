@@ -8,7 +8,8 @@
 #ifndef FVM_DOUBLE_MACH_REFLECTION_H
 #define FVM_DOUBLE_MACH_REFLECTION_H
 #include "common_compressible_FVM_classes.h"        // eulerian classes for compressible fluid in FVM only.
-#include "common_compressible_eulerian_classes.hpp" // eulerian classes for weakly compressible fluid only.
+//#include "common_compressible_eulerian_classes.hpp" // eulerian classes for weakly compressible fluid only.
+#include "general_compressible_eulerian_fluid_dynamics.hpp"
 #include "common_shared_FVM_classes.h"              // shared eulerian classes for weakly-compressible and compressible fluid in FVM.
 using namespace SPH;
 using namespace std;
