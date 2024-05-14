@@ -17,7 +17,7 @@ using namespace std;
 //----------------------------------------------------------------------
 Real DL = 80.0;                  /**< Channel length. */
 Real DH = 80.0;                  /**< Channel height. */
-Real resolution_ref = 1.0 / 20.0; /**< Initial reference particle spacing. */
+Real resolution_ref = 1.0 / 10.0; /**< Initial reference particle spacing. */
 Real DL_sponge = 2.0;            /**< Sponge region to impose inflow condition. */
 Real DH_sponge = 2.0;            /**< Sponge region to impose inflow condition. */
 Real cylinder_radius = 1.0;      /**< Radius of the cylinder. */

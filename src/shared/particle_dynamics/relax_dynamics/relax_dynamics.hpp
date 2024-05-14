@@ -227,9 +227,10 @@ void RelaxationStepInnerImplicit<RelaxationType>::exec(Real dt)
     relaxation_evolution_inner_.exec(time_step_size_);
     /* For implicit scheme, the B relaxation should keep the same configuration
        calculation for both B calculating and updating positions. */
+    surface_bounding_.exec(); //no surface_bounding for implicit scheme.
     real_body_->updateCellLinkedList(); 
     inner_relation_.updateConfiguration();
-    //surface_bounding_.exec(); //no surface_bounding for implicit scheme.
+   
 }
 //=================================================================================================//
 template <class RelaxationType>

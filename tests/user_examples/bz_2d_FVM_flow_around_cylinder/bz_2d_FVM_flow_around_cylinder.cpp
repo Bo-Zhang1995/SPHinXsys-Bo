@@ -67,9 +67,9 @@ int main(int ac, char *av[])
     //	Setup for time-stepping control
     //----------------------------------------------------------------------
     size_t number_of_iterations = 0;
-    int screen_output_interval = 1000;
-    Real end_time = 300.0;
-    Real output_interval = 1.0; /**< time stamps for output. */
+    int screen_output_interval = 10;
+    Real end_time = 5.0;
+    Real output_interval = 1; /**< time stamps for output. */
     //----------------------------------------------------------------------
     //	Statistics for CPU time
     //----------------------------------------------------------------------
@@ -78,7 +78,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    write_real_body_states.writeToFile(0);
+    //write_real_body_states.writeToFile(0);
     //----------------------------------------------------------------------
     //	Main loop starts here.
     //----------------------------------------------------------------------
@@ -106,10 +106,10 @@ int main(int ac, char *av[])
             number_of_iterations++;
         }
         TickCount t2 = TickCount::now();
-        write_real_body_states.writeToFile();
-        write_total_viscous_force_on_inserted_body.writeToFile(number_of_iterations);
-        write_total_force_on_inserted_body.writeToFile(number_of_iterations);
-        write_maximum_speed.writeToFile(number_of_iterations);
+        //write_real_body_states.writeToFile();
+        //write_total_viscous_force_on_inserted_body.writeToFile(number_of_iterations);
+        //write_total_force_on_inserted_body.writeToFile(number_of_iterations);
+        //write_maximum_speed.writeToFile(number_of_iterations);
         TickCount t3 = TickCount::now();
         interval += t3 - t2;
     }
@@ -117,7 +117,7 @@ int main(int ac, char *av[])
     TimeInterval tt;
     tt = t4 - t1 - interval;
     cout << "Total wall time for computation: " << tt.seconds() << " seconds." << endl;
-    write_total_viscous_force_on_inserted_body.testResult();
+    //write_total_viscous_force_on_inserted_body.testResult();
 
     return 0;
 }

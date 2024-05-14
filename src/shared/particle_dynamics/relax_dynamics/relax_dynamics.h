@@ -480,7 +480,8 @@ protected:
     ComplexRelation& complex_relation_;
     NearShapeSurface near_shape_surface_;
     ReduceDynamics<GetTimeStepSizeSquare> get_time_step_;
-    InteractionSplit<RelaxationComplexWithLevelSetCorrectionImplicit<RelaxationType>> relaxation_evolution_complex_;
+    InteractionSplit<RelaxationComplexImplicit<RelaxationType>> relaxation_evolution_complex_;
+    //InteractionSplit<RelaxationComplexWithLevelSetCorrectionImplicit<RelaxationType>> relaxation_evolution_complex_;
     SimpleDynamics<ShapeSurfaceBounding> surface_bounding_;
 };
 

@@ -29,7 +29,7 @@ Real c_f = 10.0 * U_f;				/**< Reference sound speed. */
 Real Re = 10000.0;						/**< Reynolds number. */
 Real mu_f = rho0_f * U_f * DL / Re; /**< Dynamics viscosity. */
 
-std::string lid_driven_mesh_file_fullpath = "./input/fluent50.msh";
+std::string lid_driven_mesh_file_fullpath = "./input/fluent100.msh";
 //----------------------------------------------------------------------
 //	Cases-dependent geometries
 //----------------------------------------------------------------------

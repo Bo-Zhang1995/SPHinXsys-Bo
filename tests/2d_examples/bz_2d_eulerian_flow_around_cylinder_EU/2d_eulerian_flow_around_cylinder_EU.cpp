@@ -12,7 +12,7 @@ using namespace SPH;
 //----------------------------------------------------------------------
 Real DL = 80.0;                        /**< Channel length. */
 Real DH = 80.0;                        /**< Channel height. */
-Real resolution_ref = 1.0 / 20.0;      /**< Initial reference particle spacing. */
+Real resolution_ref = 1.0 / 10.0;      /**< Initial reference particle spacing. */
 Real DL_sponge = resolution_ref * 2.0; /**< Sponge region to impose inflow condition. */
 Real DH_sponge = resolution_ref * 2.0; /**< Sponge region to impose inflow condition. */
 Vec2d cylinder_center(25, DH / 2.0);   /**< Location of the cylinder center. */
@@ -85,7 +85,7 @@ int main(int ac, char *av[])
     // Tag for run particle relaxation for the initial body fitted distribution.
     sph_system.setRunParticleRelaxation(false);
     // Tag for computation start with relaxed body fitted particles distribution.
-    sph_system.setReloadParticles(true);
+    sph_system.setReloadParticles(false);
     // Handle command line arguments and override the tags for particle relaxation and reload.
     sph_system.handleCommandlineOptions(ac, av);
     IOEnvironment io_environment(sph_system);
@@ -93,7 +93,7 @@ int main(int ac, char *av[])
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
     FluidBody water_block(sph_system, makeShared<WaterBlock>("WaterBlock"));
-    water_block.defineAdaptationRatios(0.9, 1.0);
+    water_block.defineAdaptationRatios(1.3, 1.0);
     water_block.defineComponentLevelSetShape("OuterBoundary")->writeLevelSet(io_environment);
     water_block.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f, mu_f);
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
@@ -102,7 +102,7 @@ int main(int ac, char *av[])
     water_block.addBodyStateForRecording<int>("Indicator");
 
     SolidBody cylinder(sph_system, makeShared<Cylinder>("Cylinder"));
-    cylinder.defineAdaptationRatios(0.8, 2.0);
+    cylinder.defineAdaptationRatios(1.15, 2.0);
     cylinder.defineBodyLevelSetShape()->writeLevelSet(io_environment);
     cylinder.defineParticlesAndMaterial<SolidParticles, Solid>();
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
@@ -141,7 +141,7 @@ int main(int ac, char *av[])
         ReduceDynamics<QuantityMaximum<Real>> calculate_water_block_maximum_kinetic_energy(water_block, "ParticleKineticEnergy");
         ReduceDynamics<QuantityMaximum<Real>> calculate_cylinder_maximum_kinetic_energy(cylinder, "ParticleKineticEnergy");
         cylinder.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
-        BodyStatesRecordingToVtp write_real_body_states(io_environment, sph_system.real_bodies_);
+        BodyStatesRecordingToPlt write_real_body_states(io_environment, sph_system.real_bodies_);
         ReloadParticleIO write_real_body_particle_reload_files(io_environment, sph_system.real_bodies_);
         //----------------------------------------------------------------------
         //	Particle relaxation starts here.
@@ -223,7 +223,7 @@ int main(int ac, char *av[])
     SimpleDynamics<NormalDirectionFromBodyShape> cylinder_normal_direction(cylinder);
     InteractionDynamics<fluid_dynamics::ViscousAccelerationWithWall> viscous_acceleration(water_block_complex);
     SimpleDynamics<NormalDirectionFromBodyShape> water_block_normal_direction(water_block);
-    ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_block, 0.5 / Dimensions);
+    ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_block);
     InteractionWithUpdate<FarFieldBoundary> variable_reset_in_boundary_condition(water_block_complex.getInnerRelation());
     InteractionWithUpdate<fluid_dynamics::FreeSurfaceIndicationComplex> surface_indicator(water_block_complex);
     InteractionDynamics<fluid_dynamics::SmearedSurfaceIndication> smeared_surface(water_block_complex.getInnerRelation());
@@ -236,7 +236,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	Define the methods for I/O operations and observations of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp write_real_body_states(io_environment, sph_system.real_bodies_);
+    BodyStatesRecordingToPlt write_real_body_states(io_environment, sph_system.real_bodies_);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<solid_dynamics::TotalForceFromFluid>>>
         write_total_viscous_force_on_inserted_body(io_environment, viscous_force_on_solid, "TotalViscousForceOnSolid");
     ReducedQuantityRecording<ReduceDynamics<solid_dynamics::TotalForceFromFluid>>
@@ -264,7 +264,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     size_t number_of_iterations = 0;
     int screen_output_interval = 1000;
-    Real end_time = 300.0;
+    Real end_time = 5.0;
     Real output_interval = 1.0; /**< time stamps for output. */
     //----------------------------------------------------------------------
     //	Statistics for CPU time
@@ -274,7 +274,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    write_real_body_states.writeToFile(0);
+    //write_real_body_states.writeToFile(0);
     //----------------------------------------------------------------------
     //	Main loop starts here.
     //----------------------------------------------------------------------
@@ -304,10 +304,8 @@ int main(int ac, char *av[])
 
         TickCount t2 = TickCount::now();
         write_real_body_states.writeToFile();
-
         write_total_viscous_force_on_inserted_body.writeToFile(number_of_iterations);
         write_total_force_on_inserted_body.writeToFile(number_of_iterations);
-
         write_maximum_speed.writeToFile(number_of_iterations);
         TickCount t3 = TickCount::now();
         interval += t3 - t2;
@@ -318,7 +316,7 @@ int main(int ac, char *av[])
     tt = t4 - t1 - interval;
     std::cout << "Total wall time for computation: " << tt.seconds() << " seconds." << std::endl;
 
-    write_total_viscous_force_on_inserted_body.testResult();
+    //write_total_viscous_force_on_inserted_body.testResult();
 
     return 0;
 }

@@ -59,27 +59,85 @@ class BaseInterpolation : public LocalDynamics, public InterpolationContactData
     };
     virtual ~BaseInterpolation(){};
 
-    inline void interaction(size_t index_i, Real dt = 0.0)
+    //inline void interaction(size_t index_i, Real dt = 0.0)
+    //{
+    //    DataType observed_quantity = ZeroData<DataType>::value;
+    //    Real ttl_weight(0);
+
+    //    for (size_t k = 0; k < this->contact_configuration_.size(); ++k)
+    //    {
+    //        StdLargeVec<Real> &Vol_k = *(contact_Vol_[k]);
+    //        StdLargeVec<DataType> &data_k = *(contact_data_[k]);
+    //        Neighborhood &contact_neighborhood = (*this->contact_configuration_[k])[index_i];
+    //        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
+    //        {
+    //            size_t index_j = contact_neighborhood.j_[n];
+    //            Real weight_j = contact_neighborhood.W_ij_[n] * Vol_k[index_j];
+
+    //            observed_quantity += weight_j * data_k[index_j];
+    //            ttl_weight += weight_j;
+    //        }
+    //    }
+    //    (*interpolated_quantities_)[index_i] = observed_quantity / (ttl_weight + TinyReal);
+    //};
+
+    void interaction(size_t index_i, Real dt = 0.0)
     {
         DataType observed_quantity = ZeroData<DataType>::value;
-        Real ttl_weight(0);
+        Mat3d correction_matrix = Eps * Mat3d::Identity();
+        Mat3d correction_matrix_inverse;
+        DataType prediction;
+        DataType gradientpredictionx;
+        DataType gradientpredictiony;
+
+        Real part1 = 0.0;
+        Vec2d part2 = Vec2d::Zero();
+        Vec2d part3 = Vec2d::Zero();
+        Mat2d part4 = Mat2d::Zero();
 
         for (size_t k = 0; k < this->contact_configuration_.size(); ++k)
         {
-            StdLargeVec<Real> &Vol_k = *(contact_Vol_[k]);
-            StdLargeVec<DataType> &data_k = *(contact_data_[k]);
-            Neighborhood &contact_neighborhood = (*this->contact_configuration_[k])[index_i];
+            StdLargeVec<Real>& Vol_k = *(contact_Vol_[k]);
+            StdLargeVec<DataType>& data_k = *(contact_data_[k]);
+            Neighborhood& contact_neighborhood = (*this->contact_configuration_[k])[index_i];
             for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
             {
                 size_t index_j = contact_neighborhood.j_[n];
-                Real weight_j = contact_neighborhood.W_ij_[n] * Vol_k[index_j];
+                Vecd e_ij = contact_neighborhood.e_ij_[n];
+                Vecd r_ji = contact_neighborhood.r_ij_[n] * contact_neighborhood.e_ij_[n];
+                Real W_ij = contact_neighborhood.W_ij_[n];
+                Real dW_ijV_j = contact_neighborhood.dW_ijV_j_[n];
 
-                observed_quantity += weight_j * data_k[index_j];
-                ttl_weight += weight_j;
+                Real alpha1 = W_ij * Vol_k[index_j];
+                Vecd alpha2 = W_ij * Vol_k[index_j] * r_ji;
+                Vecd alpha3 = dW_ijV_j * e_ij;
+                Matd alpha4 = dW_ijV_j * r_ji * e_ij.transpose();
+
+                observed_quantity += alpha1 * data_k[index_j];
+                gradientpredictionx += alpha3[0] * data_k[index_j];
+                gradientpredictiony += alpha3[1] * data_k[index_j];
+
+                part1 += alpha1;
+                part2 -= alpha2;
+                part3 += alpha3;
+                part4 -= alpha4;
             }
-        }
-        (*interpolated_quantities_)[index_i] = observed_quantity / (ttl_weight + TinyReal);
-    };
+        };
+        correction_matrix(0, 0) = part1;
+        correction_matrix(0, 1) = part2(0);
+        correction_matrix(0, 2) = part2(1);
+        correction_matrix(1, 0) = part3(0);
+        correction_matrix(1, 1) = part4(0, 0);
+        correction_matrix(1, 2) = part4(0, 1);
+        correction_matrix(2, 0) = part3(1);
+        correction_matrix(2, 1) = part4(1, 0);
+        correction_matrix(2, 2) = part4(1, 1);
+        correction_matrix_inverse = correction_matrix.inverse();
+        prediction = correction_matrix_inverse(0, 0) * observed_quantity + 
+            correction_matrix_inverse(0, 1) * gradientpredictionx + 
+            correction_matrix_inverse(0, 2) * gradientpredictiony;
+        (*interpolated_quantities_)[index_i] = prediction;
+    }
 
   protected:
     StdVec<StdLargeVec<Real> *> contact_Vol_;

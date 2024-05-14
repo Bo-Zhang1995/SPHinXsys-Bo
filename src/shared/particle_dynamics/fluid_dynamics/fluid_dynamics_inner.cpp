@@ -48,7 +48,7 @@ AcousticTimeStepSize::AcousticTimeStepSize(SPHBody &sph_body, Real acousticCFL)
       FluidDataSimple(sph_body), fluid_(DynamicCast<Fluid>(this, particles_->getBaseMaterial())),
       rho_(particles_->rho_), p_(*particles_->getVariableByName<Real>("Pressure")), vel_(particles_->vel_),
       smoothing_length_min_(sph_body.sph_adaptation_->MinimumSmoothingLength()),
-      acousticCFL_(acousticCFL) {}
+    acousticCFL_(acousticCFL) {}
 //=================================================================================================//
 Real AcousticTimeStepSize::reduce(size_t index_i, Real dt)
 {
@@ -99,6 +99,16 @@ VorticityInner::VorticityInner(BaseInnerRelation &inner_relation)
 {
     particles_->registerVariable(vorticity_, "VorticityInner");
     particles_->addVariableToWrite<AngularVecd>("VorticityInner");
+}
+//=================================================================================================//
+AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
+    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
+    pos_(particles_->pos_), vel_(particles_->vel_)
+{
+    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
+    particles_->addVariableToWrite<Real>("ThetaVorticity");
+    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
+    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
 }
 //=================================================================================================//
 BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
