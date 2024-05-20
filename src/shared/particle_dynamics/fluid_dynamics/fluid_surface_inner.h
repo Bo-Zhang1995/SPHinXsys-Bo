@@ -99,9 +99,10 @@ class DensitySummationFreeSurface : public DensitySummationType
     void update(size_t index_i, Real dt = 0.0);
 
   protected:
-    Real ReinitializedDensity(Real rho_sum, Real rho_0)
+    Real ReinitializedDensity(Real rho_sum, Real rho_0, Real rho_n)
     {
-        return SMAX(rho_sum, rho_0);
+        //return SMAX(rho_sum, rho_0);
+        return rho_sum + SMAX(0.0, (rho_n - rho_sum)) * rho_0 / rho_n;
     };
 };
 
@@ -147,6 +148,24 @@ class FreeSurfaceHeight : public BaseLocalDynamicsReduce<Real, ReduceMax, BodyPa
 
     Real reduce(size_t index_i, Real dt = 0.0) { return pos_[index_i][1]; };
 };
+class WaveFront : public BaseLocalDynamicsReduce<Real, ReduceMax, BodyPartByCell>,
+    public FluidDataSimple
+{
+protected:
+    StdLargeVec<Vecd>& pos_;
+
+public:
+    WaveFront(BodyPartByCell& body_part)
+        : BaseLocalDynamicsReduce<Real, ReduceMax, BodyPartByCell>(body_part, Real(MinRealNumber)),
+        FluidDataSimple(sph_body_), pos_(particles_->pos_)
+    {
+        quantity_name_ = "FreeSurfaceHeight";
+    }
+    virtual ~WaveFront() {};
+
+    Real reduce(size_t index_i, Real dt = 0.0) { return pos_[index_i][0]; };
+};
+
 /**
  * @class ColorFunctionGradientInner
  * @brief  indicate the particles near the interface of a fluid-fluid interaction and computing norm

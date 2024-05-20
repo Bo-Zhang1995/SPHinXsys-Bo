@@ -9,12 +9,12 @@ using namespace SPH;   // Namespace cite here.
 //----------------------------------------------------------------------
 //	Basic geometry parameters and numerical setup.
 //----------------------------------------------------------------------
-Real DL = 5.366;					/**< Water tank length. */
-Real DH = 5.366;					/**< Water tank height. */
-Real LL = 2.0;						/**< Water column length. */
-Real LH = 1.0;						/**< Water column height. */
+Real DL = 5.366;					    /**< Water tank length. */
+Real DH = 5.366;					    /**< Water tank height. */
+Real LL = 2.0;						    /**< Water column length. */
+Real LH = 1.0;						    /**< Water column height. */
 Real particle_spacing_ref = LH / 40;	/**< Initial reference particle spacing. */
-Real BW = particle_spacing_ref * 4; /**< Thickness of tank wall. */
+Real BW = particle_spacing_ref * 4;     /**< Thickness of tank wall. */
 BoundingBox system_domain_bounds(Vec2d(-BW, -BW), Vec2d(DL + BW, DH + BW));
 //----------------------------------------------------------------------
 //	Material parameters.
@@ -46,7 +46,7 @@ public:
     }
 };
 
-Real h = 1.3 * 0.025;
+Real h = 1.3 * particle_spacing_ref;
 MultiPolygon createWaveProbeShape1()
 {
     std::vector<Vecd> pnts;
@@ -102,24 +102,19 @@ MultiPolygon createWaveProbeShape4()
     return multi_polygon;
 }
 
-
-class InitialCondition
-    : public fluid_dynamics::FluidInitialCondition
+MultiPolygon createWaveFront()
 {
-public:
-    InitialCondition(SPHBody& sph_body)
-        : fluid_dynamics::FluidInitialCondition(sph_body)
-    {
-        particles_->registerVariable(weight1_, "Weight1_");
-        particles_->registerVariable(weight2_, "Weight2_");
-    };
+    std::vector<Vecd> pnts;
+    pnts.push_back(Vecd(DL, h));
+    pnts.push_back(Vecd(DL, 0));
+    pnts.push_back(Vecd(0, 0));
+    pnts.push_back(Vecd(0, h));
+    pnts.push_back(Vecd(DL, h));
 
-    void update(size_t index_particle_i, Real dt) {}
-
-protected:
-    StdLargeVec<Real> weight1_, weight2_;
-
-};
+    MultiPolygon multi_polygon;
+    multi_polygon.addAPolygon(pnts, ShapeBooleanOps::add);
+    return multi_polygon;
+}
 //----------------------------------------------------------------------
 //	Main program starts here.
 //----------------------------------------------------------------------
@@ -139,11 +134,10 @@ int main(int ac, char* av[])
     //----------------------------------------------------------------------
     //	Creating bodies with corresponding materials and particles.
     //----------------------------------------------------------------------
-    FluidBody water_block(
-        sph_system, makeShared<TransformShape<GeometricShapeBox>>(
-            Transform(water_block_translation), water_block_halfsize, "WaterBody"));
+    FluidBody water_block(sph_system, makeShared<TransformShape<GeometricShapeBox>>(Transform(water_block_translation), water_block_halfsize, "WaterBody"));
     water_block.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f);
     water_block.generateParticles<ParticleGeneratorLattice>();
+    water_block.addBodyStateForRecording<Real>("Pressure");
 
     SolidBody wall_boundary(sph_system, makeShared<WallBoundary>("WallBoundary"));
     wall_boundary.defineParticlesAndMaterial<SolidParticles, Solid>();
@@ -151,12 +145,8 @@ int main(int ac, char* av[])
     wall_boundary.addBodyStateForRecording<Vecd>("NormalDirection");
 
     ObserverBody fluid_observer(sph_system, "FluidObserver");
-    StdVec<Vecd> observation_location = { Vecd(DL, 0.2),Vecd(DL, 0.01),Vecd(DL, 0.05),Vecd(DL, 0.1),Vecd(DL, 0.2667),Vecd(DL, 0.973) };
+    StdVec<Vecd> observation_location = { Vecd(DL, 0.01), Vecd(DL, 0.1), Vecd(DL, 0.2667) };
     fluid_observer.generateParticles<ObserverParticleGenerator>(observation_location);
-
-    ObserverBody fluid_observer1(sph_system, "FluidObserver1");
-    StdVec<Vecd> observation_location1 = { Vecd(DL, 0.2),Vecd(DL, 0.01),Vecd(DL, 0.05),Vecd(DL, 0.1),Vecd(DL, 0.2667),Vecd(DL, 0.973) };
-    fluid_observer1.generateParticles<ObserverParticleGenerator>(observation_location1);
     //----------------------------------------------------------------------
     //	Define body relation map.
     //	The contact map gives the topological connections between the bodies.
@@ -164,7 +154,6 @@ int main(int ac, char* av[])
     //----------------------------------------------------------------------
     ComplexRelation water_block_complex(water_block, { &wall_boundary });
     ContactRelation fluid_observer_contact(fluid_observer, { &water_block });
-    ContactRelation fluid_observer_contact1(fluid_observer1, { &water_block });
     //----------------------------------------------------------------------
     /** check whether run particle relaxation for body fitted particle distribution. */
     if (sph_system.RunParticleRelaxation())
@@ -216,8 +205,8 @@ int main(int ac, char* av[])
     //	Define the numerical methods used in the simulation.
     //	Note that there may be data dependence on the sequence of constructions.
     //----------------------------------------------------------------------
-    SimpleDynamics<InitialCondition> initial_condition(water_block);
-    Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannWithWall> fluid_pressure_relaxation_correct(water_block_complex);
+    InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_matrix(water_block_complex, 0.9);
+    Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannConsistencyWithWall> fluid_pressure_relaxation_correct(water_block_complex);
     Dynamics1Level<fluid_dynamics::Integration2ndHalfRiemannWithWall> fluid_density_relaxation(water_block_complex);
     InteractionWithUpdate<fluid_dynamics::DensitySummationFreeSurfaceComplex> fluid_density_by_summation(water_block_complex);
     SimpleDynamics<NormalDirectionFromBodyShape> wall_boundary_normal_direction(wall_boundary);
@@ -230,14 +219,12 @@ int main(int ac, char* av[])
     //	Define the methods for I/O operations, observations
     //	and regression tests of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp body_states_recording(io_environment, sph_system.real_bodies_);
+    BodyStatesRecordingToPlt body_states_recording(io_environment, sph_system.real_bodies_);
     RestartIO restart_io(io_environment, sph_system.real_bodies_);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<TotalMechanicalEnergy>>>
         write_water_mechanical_energy(io_environment, water_block, gravity_ptr);
     RegressionTestDynamicTimeWarping<ObservedQuantityRecording<Real>>
         write_recorded_water_pressure("Pressure", io_environment, fluid_observer_contact);
-    RegressionTestDynamicTimeWarping<ObservedQuantityRecording<Real>>
-        write_recorded_water_pressure1("Pressure", io_environment, fluid_observer_contact1);
 
     /** WaveProbes. */
     BodyRegionByCell wave_probe_buffer_no_1(water_block, makeShared<MultiPolygonShape>(createWaveProbeShape1(), "WaveProbe_01"));
@@ -252,6 +239,9 @@ int main(int ac, char* av[])
     BodyRegionByCell wave_probe_buffer_no_4(water_block, makeShared<MultiPolygonShape>(createWaveProbeShape4(), "WaveProbe_04"));
     ReducedQuantityRecording<ReduceDynamics<fluid_dynamics::FreeSurfaceHeight>>
         wave_probe_4(io_environment, wave_probe_buffer_no_4);
+    BodyRegionByCell wavefront_buff(water_block, makeShared<MultiPolygonShape>(createWaveFront(), "WaveFront"));
+    ReducedQuantityRecording<ReduceDynamics<fluid_dynamics::WaveFront>>
+        wavefront(io_environment, wavefront_buff);
     //----------------------------------------------------------------------
     //	Prepare the simulation with cell linked list, configuration
     //	and case specified initial condition if necessary.
@@ -259,7 +249,6 @@ int main(int ac, char* av[])
     sph_system.initializeSystemCellLinkedLists();
     sph_system.initializeSystemConfigurations();
     wall_boundary_normal_direction.exec();
-    initial_condition.exec();
     //----------------------------------------------------------------------
     //	Load restart file if necessary.
     //----------------------------------------------------------------------
@@ -274,10 +263,10 @@ int main(int ac, char* av[])
     //----------------------------------------------------------------------
     size_t number_of_iterations = sph_system.RestartStep();
     int screen_output_interval = 100;
-    int observation_sample_interval = screen_output_interval * 2;
+    int observation_sample_interval = screen_output_interval * 0.01;
     int restart_output_interval = screen_output_interval * 10;
-    Real end_time = 15.0;
-    Real output_interval = 0.1;
+    Real end_time = 5;
+    Real output_interval = end_time / 100;
     //----------------------------------------------------------------------
     //	Statistics for CPU time
     //----------------------------------------------------------------------
@@ -296,8 +285,8 @@ int main(int ac, char* av[])
     wave_probe_2.writeToFile(0);
     wave_probe_3.writeToFile(0);
     wave_probe_4.writeToFile(0);
+    wavefront.writeToFile(0);
     write_recorded_water_pressure.writeToFile(0);
-    write_recorded_water_pressure1.writeToFile(0);
     //----------------------------------------------------------------------
     //	Main loop starts here.
     //----------------------------------------------------------------------
@@ -312,6 +301,7 @@ int main(int ac, char* av[])
             fluid_step_initialization.exec();
             Real advection_dt = fluid_advection_time_step.exec();
             fluid_density_by_summation.exec();
+            kernel_correction_matrix.exec();
             interval_computing_time_step += TickCount::now() - time_instance;
 
             time_instance = TickCount::now();
@@ -335,20 +325,14 @@ int main(int ac, char* av[])
                 std::cout << std::fixed << std::setprecision(9) << "N=" << number_of_iterations << "	Time = "
                     << GlobalStaticVariables::physical_time_
                     << "	advection_dt = " << advection_dt << "	acoustic_dt = " << acoustic_dt << "\n";
-
-                if (number_of_iterations % observation_sample_interval == 0 && number_of_iterations != sph_system.RestartStep())
-                {
-                    write_water_mechanical_energy.writeToFile(number_of_iterations);
-                    wave_probe_1.writeToFile(number_of_iterations);
-                    wave_probe_2.writeToFile(number_of_iterations);
-                    wave_probe_3.writeToFile(number_of_iterations);
-                    wave_probe_4.writeToFile(number_of_iterations);
-                    write_recorded_water_pressure.writeToFile(number_of_iterations);
-                    write_recorded_water_pressure1.writeToFile(number_of_iterations);
-                }
-                if (number_of_iterations % restart_output_interval == 0)
-                    restart_io.writeToFile(number_of_iterations);
             }
+            write_water_mechanical_energy.writeToFile(number_of_iterations);
+            wave_probe_1.writeToFile(number_of_iterations);
+            wave_probe_2.writeToFile(number_of_iterations);
+            wave_probe_3.writeToFile(number_of_iterations);
+            wave_probe_4.writeToFile(number_of_iterations);
+            write_recorded_water_pressure.writeToFile(number_of_iterations);
+            wavefront.writeToFile(number_of_iterations);
             number_of_iterations++;
 
             /** Update cell linked list and configuration. */
@@ -356,7 +340,6 @@ int main(int ac, char* av[])
             water_block.updateCellLinkedListWithParticleSort(100);
             water_block_complex.updateConfiguration();
             fluid_observer_contact.updateConfiguration();
-            fluid_observer_contact1.updateConfiguration();
             interval_updating_configuration += TickCount::now() - time_instance;
         }
 

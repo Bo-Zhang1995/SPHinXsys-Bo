@@ -142,19 +142,19 @@ using ViscousAccelerationWithWall = BaseViscousAccelerationWithWall<ViscousAccel
  * @class AngleVorticityWithWall
  * @brief xxx
  */
-template <class AngleVorticityInnerType>
-class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseAngleVorticityWithWall(Args &&...args)
-        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseAngleVorticityWithWall() {};
+//template <class AngleVorticityInnerType>
+//class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
+//{
+//public:
+//    template <typename... Args>
+//    BaseAngleVorticityWithWall(Args &&...args)
+//        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
+//    virtual ~BaseAngleVorticityWithWall() {};
+//
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//};
 
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-
-using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
+//using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
 
 /**
  * @class BaseIntegration1stHalfWithWall

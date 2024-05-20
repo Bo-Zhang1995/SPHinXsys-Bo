@@ -227,20 +227,20 @@ class VorticityInner : public LocalDynamics, public FluidDataInner
 
 /**
  * @class AngleVorticity
- */
-class AngleVorticityInner : public LocalDynamics, public FluidDataInner
-{
-public:
-    explicit AngleVorticityInner(BaseInnerRelation& inner_relation);
-    virtual ~AngleVorticityInner() {};
-    inline void interaction(size_t index_i, Real dt = 0.0);
-    inline void update(size_t index_i, Real dt = 0.0);
-
-protected:
-    StdLargeVec<Vecd>& vel_, & pos_;
-    StdLargeVec<Real> theta_vorticity_;
-    StdLargeVec<Mat3d> velocity_gradient_;
-};
+// */
+//class AngleVorticityInner : public LocalDynamics, public FluidDataInner
+//{
+//public:
+//    explicit AngleVorticityInner(BaseInnerRelation& inner_relation);
+//    virtual ~AngleVorticityInner() {};
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//    inline void update(size_t index_i, Real dt = 0.0);
+//
+//protected:
+//    StdLargeVec<Vecd>& vel_, & pos_;
+//    StdLargeVec<Real> theta_vorticity_;
+//    StdLargeVec<Mat3d> velocity_gradient_;
+//};
 
 /**
  * @class /

@@ -23,7 +23,7 @@ BaseDensitySummationInner::BaseDensitySummationInner(BaseInnerRelation &inner_re
 void BaseDensitySummationInner::update(size_t index_i, Real dt)
 {
     rho_[index_i] = rho_sum_[index_i];
-    Vol_[index_i] = mass_[index_i] / rho_[index_i];
+    //Vol_[index_i] = mass_[index_i] / rho_[index_i];
 }
 //=================================================================================================//
 DensitySummationInner::DensitySummationInner(BaseInnerRelation &inner_relation)
@@ -59,7 +59,7 @@ Real AcousticTimeStepSize::outputResult(Real reduced_value)
 {
     // since the particle does not change its configuration in pressure relaxation step
     // I chose a time-step size according to Eulerian method
-    return acousticCFL_ * smoothing_length_min_ / (reduced_value + TinyReal) / 2;
+    return acousticCFL_ * smoothing_length_min_ / (reduced_value + TinyReal);
 }
 //=================================================================================================//
 AdvectionTimeStepSizeForImplicitViscosity::
@@ -101,15 +101,15 @@ VorticityInner::VorticityInner(BaseInnerRelation &inner_relation)
     particles_->addVariableToWrite<AngularVecd>("VorticityInner");
 }
 //=================================================================================================//
-AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
-    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
-    pos_(particles_->pos_), vel_(particles_->vel_)
-{
-    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
-    particles_->addVariableToWrite<Real>("ThetaVorticity");
-    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
-    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
-}
+//AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
+//    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
+//    pos_(particles_->pos_), vel_(particles_->vel_)
+//{
+//    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
+//    particles_->addVariableToWrite<Real>("ThetaVorticity");
+//    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
+//    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
+//}
 //=================================================================================================//
 BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
     : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),

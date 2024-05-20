@@ -93,42 +93,42 @@ void VorticityInner::interaction(size_t index_i, Real dt)
     vorticity_[index_i] = vorticity;
 }
 //=================================================================================================//
-void AngleVorticityInner::interaction(size_t index_i, Real dt)
-{
-    Mat3d velocity_gradient = ZeroData<Mat3d>::value;
-    const Neighborhood& inner_neighborhood = inner_configuration_[index_i];
-    for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
-    {
-        size_t index_j = inner_neighborhood.j_[n];
-
-        Vecd vel_diff = vel_[index_i] - vel_[index_j];
-        velocity_gradient += vel_diff * inner_neighborhood.e_ij_[n].transpose() * inner_neighborhood.dW_ijV_j_[n];
-    }
-    velocity_gradient_[index_i] = velocity_gradient;  
-}
+//void AngleVorticityInner::interaction(size_t index_i, Real dt)
+//{
+//    Mat3d velocity_gradient = ZeroData<Mat3d>::value;
+//    const Neighborhood& inner_neighborhood = inner_configuration_[index_i];
+//    for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
+//    {
+//        size_t index_j = inner_neighborhood.j_[n];
+//
+//        Vecd vel_diff = vel_[index_i] - vel_[index_j];
+//        velocity_gradient += vel_diff * inner_neighborhood.e_ij_[n].transpose() * inner_neighborhood.dW_ijV_j_[n];
+//    }
+//    velocity_gradient_[index_i] = velocity_gradient;  
+//}
 //=================================================================================================//
-void AngleVorticityInner::update(size_t index_i, Real dt)
-{
-    Real dUdX = velocity_gradient_[index_i](0, 0);
-    Real dUdY = velocity_gradient_[index_i](0, 1);
-    Real dUdZ = velocity_gradient_[index_i](0, 2);
-
-    Real dVdX = velocity_gradient_[index_i](1, 0);
-    Real dVdY = velocity_gradient_[index_i](1, 1);
-    Real dVdZ = velocity_gradient_[index_i](1, 2);
-
-    Real dWdX = velocity_gradient_[index_i](2, 0);
-    Real dWdY = velocity_gradient_[index_i](2, 1);
-    Real dWdZ = velocity_gradient_[index_i](2, 2);
-
-    Real x = pos_[index_i][0];
-    Real y = pos_[index_i][1];
-    Real radius = sqrt(pow(x, 2) + pow(y, 2));
-    Real angular = atan2(y, x);
-
-    theta_vorticity_[index_i] = cos(angular) * dUdZ + sin(angular) * dVdZ + pow(radius, -1.5) * (x * dWdX + y * dWdY);
-}
-//=================================================================================================//
+//void AngleVorticityInner::update(size_t index_i, Real dt)
+//{
+//    Real dUdX = velocity_gradient_[index_i](0, 0);
+//    Real dUdY = velocity_gradient_[index_i](0, 1);
+//    Real dUdZ = velocity_gradient_[index_i](0, 2);
+//
+//    Real dVdX = velocity_gradient_[index_i](1, 0);
+//    Real dVdY = velocity_gradient_[index_i](1, 1);
+//    Real dVdZ = velocity_gradient_[index_i](1, 2);
+//
+//    Real dWdX = velocity_gradient_[index_i](2, 0);
+//    Real dWdY = velocity_gradient_[index_i](2, 1);
+//    Real dWdZ = velocity_gradient_[index_i](2, 2);
+//
+//    Real x = pos_[index_i][0];
+//    Real y = pos_[index_i][1];
+//    Real radius = sqrt(pow(x, 2) + pow(y, 2));
+//    Real angular = atan2(y, x);
+//
+//    theta_vorticity_[index_i] = cos(angular) * dUdZ + sin(angular) * dVdZ + pow(radius, -1.5) * (x * dWdX + y * dWdY);
+//}
+////=================================================================================================//
 void Oldroyd_BIntegration1stHalf::
     interaction(size_t index_i, Real dt)
 {
