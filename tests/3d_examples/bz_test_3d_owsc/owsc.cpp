@@ -23,7 +23,7 @@ int main()
 	/** Tag for run particle relaxation for the initial body fitted distribution. */
 	system.setRunParticleRelaxation(false);
 	/** Tag for computation start with relaxed body fitted particles distribution. */
-	system.setReloadParticles(true);
+	system.setReloadParticles(false);
 
 	/** The water block, body, material and particles container. */
 	FluidBody water_block(system, makeShared<Water>("WaterBody"));
@@ -50,11 +50,11 @@ int main()
 	observer.generateParticles<FlapObserverParticleGenerator>();
 
 	/** Gravity. */
-	Gravity gravity(Vec3d(0.0,-gravity_g, 0.0));
+	Gravity gravity(Vec3d(0.0, -gravity_g, 0.0));
 	/** topology */
 	InnerRelation water_block_inner(water_block);
 	InnerRelation flap_inner(flap);
-	ComplexRelation water_block_complex(water_block_inner, { &wall_boundary, &wave_maker,&flap });
+	ComplexRelation water_block_complex(water_block_inner, { &wall_boundary, &wave_maker, &flap });
 	ComplexRelation wave_maker_complex(wave_maker, { &water_block });
 	ComplexRelation flap_complex(flap, { &water_block });
 	ContactRelation flap_contact(flap, { &water_block });
@@ -68,11 +68,11 @@ int main()
 		/**
 		 * @brief 	Methods used for particle relaxation.
 		 */
-		/** Random reset the insert body particle position. */
+		 /** Random reset the insert body particle position. */
 		SimpleDynamics<RandomizeParticlePosition> random_flap_particles(flap);
 		SimpleDynamics<RandomizeParticlePosition> random_wall_particles(wall_boundary);
 		/** Write the body state to Vtu file. */
-		BodyStatesRecordingToVtp write_relaxed_body(io_environment, { &flap, &wall_boundary});
+		BodyStatesRecordingToVtp write_relaxed_body(io_environment, { &flap, &wall_boundary });
 		/** Write the particle reload files. */
 		ReloadParticleIO write_particle_reload_files(io_environment, { &flap, &wall_boundary });
 		/** A  Physics relaxation step. */
@@ -112,8 +112,7 @@ int main()
 	SimpleDynamics<NormalDirectionFromBodyShape> flap_normal_direction(flap);
 
 	InteractionWithUpdate<KernelCorrectionMatrixComplex> corrected_configuration_fluid(water_block_complex, 0.95);
-	InteractionWithUpdate<KernelCorrectionMatrixComplex> corrected_configuration_wave_maker(wave_maker_complex);
-	InteractionWithUpdate<KernelCorrectionMatrixComplex> corrected_configuration_flap(flap_complex);
+	InteractionWithUpdate<KernelCorrectionMatrixInner> corrected_configuration_flap(flap_inner);
 	/** Time step initialization, add gravity. */
 	SimpleDynamics<TimeStepInitialization> initialize_time_step_to_fluid(water_block, makeShared<Gravity>(Vec3d(0.0, -gravity_g, 0.0)));
 	/** Evaluation of density by summation approach. */
@@ -150,60 +149,60 @@ int main()
 	//FlapSystemForSimbody*  	flap_multibody = new FlapSystemForSimbody(my_flap, "OWSC-Pin", rho0_s);
 	FlapSystemForSimbody flap_multibody(flap, makeShared<TriangleMeshShapeSTL>(path_to_flap_stl, translation_flap, length_scale, "FlapMultiBody"));
 	//FlapSystemForSimbody flap_multibody(flap, makeShared<TransformShape<GeometricShapeBox>>(CreateCADGeometryForOWSC(), "FlapMultiBody"));
-	/** Mass properties of the consrained spot. 
+	/** Mass properties of the consrained spot.
 	 * SimTK::MassProperties(mass, center of mass, inertia)
 	 */
 	SimTK::Body::Rigid   pin_spot_info(*flap_multibody.body_part_mass_properties_);
-	/** 
-	 * @brief   Pin (MobilizedBody &parent, const Transform &X_PF, const Body &bodyInfo, const 
-	 					Transform &X_BM, Direction=Forward)1
-	 * @details Create a Pin mobilizer between an existing parent (inboard) body P and 
-	 * 			a new child (outboard) body B created by copying the given bodyInfo into 
+	/**
+	 * @brief   Pin (MobilizedBody &parent, const Transform &X_PF, const Body &bodyInfo, const
+						Transform &X_BM, Direction=Forward)1
+	 * @details Create a Pin mobilizer between an existing parent (inboard) body P and
+	 * 			a new child (outboard) body B created by copying the given bodyInfo into
 	 *			a privately-owned Body within the constructed MobilizedBody object.
 	 * @param[in] inboard(SimTK::Vec3) Defines the location of the joint point relative to the parent body.
-	 * @param[in] outboard(SimTK::Vec3) Defines the body's origin location to the jiont point. 
+	 * @param[in] outboard(SimTK::Vec3) Defines the body's origin location to the jiont point.
 	 * @note	The body's rogin location can be the mass center, the the center of mass shouled be Vec3(0)
 	 * 			in SimTK::MassProperties(mass, com, inertia)
 	 */
-	SimTK::MobilizedBody::Pin pin_spot(matter.Ground(), SimTK::Transform(SimTK::Vec3(7.92, 0.315, 0.0)), 
+	SimTK::MobilizedBody::Pin pin_spot(matter.Ground(), SimTK::Transform(SimTK::Vec3(7.92, 0.315, 0.0)),
 		pin_spot_info, SimTK::Transform(SimTK::Vec3(0.0, 0.0, 0.0)));
 	/** set the default angle of the pin. */
 	pin_spot.setDefaultAngle(0);
-	/** 
-	 * @details Add gravity to mb body. 
+	/**
+	 * @details Add gravity to mb body.
 	 * @param[in,out] forces, The subsystem to which this force should be added.
 	 * @param[in]     matter, The subsystem containing the bodies that will be affected.
-	 * @param[in]    gravity, The default gravity vector v, interpreted as v=g*d where g=|\a gravity| is 
-     *				a positive scalar and d is the "down" direction unit vector d=\a gravity/g.
+	 * @param[in]    gravity, The default gravity vector v, interpreted as v=g*d where g=|\a gravity| is
+	 *				a positive scalar and d is the "down" direction unit vector d=\a gravity/g.
 	 * @param[in]  zeroHeight This is an optional specification of the default value for the height
-     *				up the gravity vector that is considered to be "zero" for purposes of
-     *				calculating the gravitational potential energy. The default is 
-     *				 zeroHeight == 0, i.e., a body's potential energy is defined to be zero
-     *				when the height of its mass center is the same as the height of the Ground
-     *				origin. The zero height will have the value specified here unless
-     *				explicitly changed within a particular State use the setZeroHeight() 
-     *			method. 
-	 * @par Force Each body B that has not been explicitly excluded will experience a force 
-	 *		fb = mb*g*d, applied to its center of mass, where mb is the mass of body B. 
+	 *				up the gravity vector that is considered to be "zero" for purposes of
+	 *				calculating the gravitational potential energy. The default is
+	 *				 zeroHeight == 0, i.e., a body's potential energy is defined to be zero
+	 *				when the height of its mass center is the same as the height of the Ground
+	 *				origin. The zero height will have the value specified here unless
+	 *				explicitly changed within a particular State use the setZeroHeight()
+	 *			method.
+	 * @par Force Each body B that has not been explicitly excluded will experience a force
+	 *		fb = mb*g*d, applied to its center of mass, where mb is the mass of body B.
 	 * @par Potential Energy
-	 *		Gravitational potential energy for a body B is mb*g*hb where hb is the height of 
-	 *		body B's mass center over an arbitrary "zero" height hz (default is hz=0), 
-	 *		measured along the "up" direction -d. If pb is the Ground frame vector giving 
-	 *		the position of body B's mass center, its height over or under hz is 
-	 *		hb=pb*(-d) - hz. Note that this is a signed quantity so the potential energy is 
-	 *		also signed. 
+	 *		Gravitational potential energy for a body B is mb*g*hb where hb is the height of
+	 *		body B's mass center over an arbitrary "zero" height hz (default is hz=0),
+	 *		measured along the "up" direction -d. If pb is the Ground frame vector giving
+	 *		the position of body B's mass center, its height over or under hz is
+	 *		hb=pb*(-d) - hz. Note that this is a signed quantity so the potential energy is
+	 *		also signed.
 	 */
 	SimTK::Force::UniformGravity sim_gravity(forces, matter, SimTK::Vec3(0.0, -gravity_g, 0.0), 0.0);
 	/** discreted forces acting on the bodies. */
 	SimTK::Force::DiscreteForces force_on_bodies(forces, matter);
 	/**
 	 * Add a linear damping force to the mobilized body.
-	 * @class SimTK::Force::MobilityLinearDamper::MobilityLinearDamper( 	
+	 * @class SimTK::Force::MobilityLinearDamper::MobilityLinearDamper(
 	 * @param[in]	GeneralForceSubsystem &  	forces,
 	 * @param[in]	const MobilizedBody &  	mobod,
-     * @param[in]	MobilizerUIndex  whichU, e.g., MobilizerUIndex(0)
-	 * @param[in]	Real  	Dampingconstant ) 
-	 * Here, The damping constant c is provided, with the generated force being -c*u where u is the mobility's generalized speed.	
+	 * @param[in]	MobilizerUIndex  whichU, e.g., MobilizerUIndex(0)
+	 * @param[in]	Real  	Dampingconstant )
+	 * Here, The damping constant c is provided, with the generated force being -c*u where u is the mobility's generalized speed.
 	 */
 	SimTK::Force::MobilityLinearDamper linear_damper(forces, pin_spot, SimTK::MobilizerUIndex(0), 0.0);
 	/** Time steping method for multibody system.*/
@@ -230,7 +229,7 @@ int main()
 	ReducedQuantityRecording<ReduceDynamics<fluid_dynamics::FreeSurfaceHeight>>
 		wave_probe_4(io_environment, wave_probe_buffer_no_4);
 
-	BodyRegionByCell wave_probe_buffer_no_5(water_block, makeShared<TransformShape<GeometricShapeBox>>(Transform(translation_No5), halfsize_No5,  "WaveProbe_05"));
+	BodyRegionByCell wave_probe_buffer_no_5(water_block, makeShared<TransformShape<GeometricShapeBox>>(Transform(translation_No5), halfsize_No5, "WaveProbe_05"));
 	ReducedQuantityRecording<ReduceDynamics<fluid_dynamics::FreeSurfaceHeight>>
 		wave_probe_5(io_environment, wave_probe_buffer_no_5);
 
@@ -253,6 +252,7 @@ int main()
 	wall_boundary_normal_direction.exec();
 	wave_maker_normal_direction.exec();
 	flap_normal_direction.exec();
+	corrected_configuration_flap.exec();
 
 	write_real_body_states.writeToFile(0);
 	write_total_force_on_flap.writeToFile(0);
@@ -269,7 +269,7 @@ int main()
 	Real D_Time = total_physical_time / 500.0;
 	Real Observe_Time = 0.01;
 	Real Dt = 0.0;
-	Real dt = 0.0; 
+	Real dt = 0.0;
 	Real total_time = 0.0;
 	/** statistics for computing time. */
 	TickCount t1 = TickCount::now();
@@ -278,11 +278,11 @@ int main()
 	while (GlobalStaticVariables::physical_time_ < End_Time)
 	{
 		Real integeral_time = 0.0;
-		while (integeral_time < D_Time) 
+		while (integeral_time < D_Time)
 		{
 			Real observ_out_time = 0.0;
-			while (observ_out_time < Observe_Time) 
-			{ 
+			while (observ_out_time < Observe_Time)
+			{
 				initialize_time_step_to_fluid.exec();
 				Dt = get_fluid_advection_time_step_size.exec();
 				update_density_by_summation.exec();
@@ -290,17 +290,15 @@ int main()
 				/** Viscous force exerting on flap. */
 				viscous_force_on_solid.exec();
 				corrected_configuration_fluid.exec();
-				corrected_configuration_wave_maker.exec();
-				corrected_configuration_flap.exec();
 
 				Real relaxation_time = 0.0;
-				while (relaxation_time < Dt) 
+				while (relaxation_time < Dt)
 				{
 					pressure_relaxation.exec(dt);
 					fluid_force_on_flap.exec();
 					density_relaxation.exec(dt);
-			
-					if(total_time >= relax_time)
+
+					if (total_time >= relax_time)
 					{
 						SimTK::State& state_for_update = integ.updAdvancedState();
 						Real angle = pin_spot.getAngle(state_for_update);
@@ -310,18 +308,18 @@ int main()
 						constraint_spot_flap.exec();
 						wave_making.exec(dt);
 					}
-					
+
 					interpolation_observer_position.exec();
 
-					dt = get_fluid_time_step_size.exec();
+					dt = 0.5 * get_fluid_time_step_size.exec();
 					relaxation_time += dt;
 					integeral_time += dt;
 					observ_out_time += dt;
 					total_time += dt;
-					if(total_time >= relax_time)
+					if (total_time >= relax_time)
 						GlobalStaticVariables::physical_time_ += dt;
 				}
-				
+
 				if (number_of_iterations % screen_output_interval == 0)
 				{
 					std::cout << std::fixed << std::setprecision(9) << "N=" << number_of_iterations
@@ -342,7 +340,7 @@ int main()
 				observer_contact_with_water.updateConfiguration();
 
 			}
-			if(total_time >= relax_time)
+			if (total_time >= relax_time)
 			{
 				write_total_force_on_flap.writeToFile(number_of_iterations);
 				write_flap_pin_data.writeToFile(GlobalStaticVariables::physical_time_);
