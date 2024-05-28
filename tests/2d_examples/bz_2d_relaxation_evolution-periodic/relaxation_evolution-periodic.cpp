@@ -69,7 +69,8 @@ int main(int ac, char* av[])
 	//	Creating body, materials and particles.
 	//----------------------------------------------------------------------
 	FluidBody body(sph_system, makeShared<Insert>("WaterBody"));
-	body.defineAdaptationRatios(1.1, 1.0);
+	body.sph_adaptation_->resetKernel<KernelTabulated<KernelLaguerreGauss>>(20);
+	body.defineAdaptationRatios(1.3, 1.0);
 	body.defineBodyLevelSetShape()->writeLevelSet(io_environment);
 	body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(1,1,1);
 	body.addBodyStateForRecording<Vecd>("Position");
@@ -161,7 +162,7 @@ int main(int ac, char* av[])
 			ab_term << " " << ar_term << " " << b_term << "\n";
 
 		GlobalStaticVariables::physical_time_ = ite;
-		while (body_average_kinetic_energy > 3e-5)
+		while (body_average_kinetic_energy > 1e-5)
 		{
 			periodic_condition_x.bounding_.exec();
 			periodic_condition_y.bounding_.exec();

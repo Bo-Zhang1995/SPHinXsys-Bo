@@ -97,19 +97,19 @@ VorticityInner::VorticityInner(BaseInnerRelation &inner_relation)
     : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
       vel_(particles_->vel_)
 {
-    particles_->registerVariable(vorticity_, "VorticityInner");
-    particles_->addVariableToWrite<AngularVecd>("VorticityInner");
+    particles_->registerVariable(vorticity_, "Vorticity");
+    particles_->addVariableToWrite<AngularVecd>("Vorticity");
 }
 //=================================================================================================//
-//AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
-//    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
-//    pos_(particles_->pos_), vel_(particles_->vel_)
-//{
-//    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
-//    particles_->addVariableToWrite<Real>("ThetaVorticity");
-//    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
-//    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
-//}
+AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
+    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
+    pos_(particles_->pos_), vel_(particles_->vel_)
+{
+    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
+    particles_->addVariableToWrite<Real>("ThetaVorticity");
+    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
+    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
+}
 //=================================================================================================//
 BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
     : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),

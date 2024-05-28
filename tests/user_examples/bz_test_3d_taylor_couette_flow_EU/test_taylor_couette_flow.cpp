@@ -39,24 +39,11 @@ Real mu_f = rho0_f * U_f * R_in / Re;       /**< Dynamics viscosity. */
 //----------------------------------------------------------------------
 //	Cases-dependent geometries
 //----------------------------------------------------------------------
-class InnerColumn : public ComplexShape
-{
-public:
-	explicit InnerColumn(const std::string& shape_name) : ComplexShape(shape_name)
-	{
-		Vecd translation_column(0.0, 0.0, 0.0);
-		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
-	}
-};
-
 class FluidColumn : public ComplexShape
 {
 public:
 	explicit FluidColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		//Vecd translation_column(0.0, 0.0, 0.0);
-		//add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column);
-		//subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
 		add<TriangleMeshShapeSTL>(full_path_to_file_fluid, translation, scaling);
 	}
 };
@@ -66,11 +53,6 @@ class OuterColumn : public ComplexShape
 public:
 	explicit OuterColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		//Vecd translation_column(0.0, 0.0, 0.0);
-		//add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out + BW, 0.5 * L + BW, resolution, translation_column);
-		///subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column);
-		//add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
-		//subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in - BW, 0.5 * L - BW, resolution, translation_column);
 		add<TriangleMeshShapeSTL>(full_path_to_file_wall, translation, scaling);
 	}
 };
@@ -263,9 +245,11 @@ int main(int ac, char *av[])
 	InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfHLLERiemannWithWall> pressure_relaxation(water_block_complex);
 	InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfHLLERiemannWithWall> density_and_energy_relaxation(water_block_complex);
 	/** Computing vorticity in the flow. */
+	InteractionDynamics<fluid_dynamics::VorticityWithWall> compute_vorticity_xyz(water_block_complex_corrected);
 	InteractionWithUpdate<fluid_dynamics::AngleVorticityWithWall> compute_vorticity(water_block_complex);
 	water_body.addBodyStateForRecording<Real>("ThetaVorticity");
 	water_body.addBodyStateForRecording<Mat3d>("VelocityGradient");
+	water_body.addBodyStateForRecording<AngularVecd>("Vorticity");
 	//----------------------------------------------------------------------
 	//	Define the methods for I/O operations and observations of the simulation.
 	//----------------------------------------------------------------------
@@ -291,7 +275,7 @@ int main(int ac, char *av[])
 	size_t number_of_iterations = 0;
 	int screen_output_interval = 100;
 	int restart_output_interval = screen_output_interval * 10;
-	Real End_Time = 500.0; /**< End time. */
+	Real End_Time = 1000.0; /**< End time. */
 	Real D_Time = 10.0;	 /**< Time stamps for output of body states. */
 	/** statistics for computing CPU time. */
 	TickCount t1 = TickCount::now();
@@ -336,6 +320,7 @@ int main(int ac, char *av[])
 
 		TickCount t2 = TickCount::now();
 		compute_vorticity.exec();
+		compute_vorticity_xyz.exec();
 		body_states_recording.writeToFile();
 		TickCount t3 = TickCount::now();
         interval += t3 - t2;
