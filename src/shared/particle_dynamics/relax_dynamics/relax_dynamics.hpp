@@ -223,7 +223,7 @@ RelaxationStepInnerImplicit(BaseInnerRelation& inner_relation, bool level_set_co
 template <class RelaxationType>
 void RelaxationStepInnerImplicit<RelaxationType>::exec(Real dt)
 {
-    time_step_size_ =  sqrt(get_time_step_.exec());
+    time_step_size_ =  20 * sqrt(get_time_step_.exec());
     relaxation_evolution_inner_.exec(time_step_size_);
     /* For implicit scheme, the B relaxation should keep the same configuration
        calculation for both B calculating and updating positions. */

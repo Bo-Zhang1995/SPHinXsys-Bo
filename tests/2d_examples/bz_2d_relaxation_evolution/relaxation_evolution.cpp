@@ -1,6 +1,6 @@
 /**
  * @file 	relaxation_evolution.cpp
- * @brief 	This is the first case by testing the relaxation with evolution method.
+ * @brief 	This is the first case to conduct error and convergence analysis.
  * @author 	Bo Zhang
  */
 #include "sphinxsys.h"
@@ -18,39 +18,6 @@ BoundingBox system_domain_bounds(Vec2d(-2 * BW - DL, -2 * BW - DH), Vec2d(DL + 2
 //----------------------------------------------------------------------
 //	Define geometries
 //----------------------------------------------------------------------
-std::vector<Vecd> createBlockDomain()
-{
-    std::vector<Vecd> blockDomain;
-    blockDomain.push_back(Vecd(-BW, -BW));
-    blockDomain.push_back(Vecd(-BW, DH + BW));
-    blockDomain.push_back(Vecd(DL + BW, DH + BW));
-    blockDomain.push_back(Vecd(DL + BW, -BW));
-    blockDomain.push_back(Vecd(-BW, -BW));
-
-    return blockDomain;
-};
-
-std::vector<Vecd> createAverageDomain()
-{
-    std::vector<Vecd> averageDomain;
-    averageDomain.push_back(Vecd(0.0, 0.0));
-    averageDomain.push_back(Vecd(0.0, DH));
-    averageDomain.push_back(Vecd(DL, DH));
-    averageDomain.push_back(Vecd(DL, 0.0));
-    averageDomain.push_back(Vecd(0.0, 0.0));
-
-    return averageDomain;
-};
-
-class Block : public MultiPolygonShape
-{
-public:
-    explicit Block(const std::string& shape_name) : MultiPolygonShape(shape_name)
-    {
-        multi_polygon_.addAPolygon(createBlockDomain(), ShapeBooleanOps::add);
-    }
-};
-
 MultiPolygon averageDomain()
 {
     MultiPolygon multi_polygon;
@@ -83,7 +50,8 @@ public:
     void update(size_t index_i, Real dt)
     {
         /* initial scalar field distribution. */
-        scalar_[index_i] = exp(-pos_[index_i][0] * pos_[index_i][0] / 0.1);
+        //scalar_[index_i] = exp(-pos_[index_i][0] * pos_[index_i][0] / 0.1);
+        scalar_[index_i] = pos_[index_i][0];
     }
 
 protected:
@@ -99,18 +67,19 @@ int main(int ac, char *av[])
     //	Build up the environment of a SPHSystem with global controls.
     //----------------------------------------------------------------------
     SPHSystem sph_system(system_domain_bounds, resolution_ref);
-    sph_system.setRunParticleRelaxation(true);
+    sph_system.setRunParticleRelaxation(false);
     sph_system.setReloadParticles(true);
 #ifdef BOOST_AVAILABLE
     sph_system.handleCommandlineOptions(ac, av); // handle command line arguments
 #endif
     IOEnvironment io_environment(sph_system);
-    //----------------------------------------------------------------------
+    //------ ----------------------------------------------------------------
     //	Creating body, materials and particles.
     //----------------------------------------------------------------------
     FluidBody body(sph_system, makeShared<Circle>("Body"));
-    body.defineBodyLevelSetShape()->writeLevelSet(io_environment);
-    body.defineAdaptationRatios(0.8, 1.0);
+    body.defineBodyLevelSetShape()->writeLevelSet(io_environment); 
+    body.sph_adaptation_->resetKernel<KernelTabulated<KernelLaguerreGauss>>(20);
+    body.defineAdaptationRatios(1.3, 1.0);
     body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(1, 1, 1);
     body.addBodyStateForRecording<Vecd>("Position");
     (!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
@@ -142,32 +111,12 @@ int main(int ac, char *av[])
         relax_dynamics::RelaxationStepInnerImplicit<CorrectionMatrixRelaxation> relaxation_inner_implicit(body_inner);
         /* Update the relaxation residual. */
         SimpleDynamics<TestingInitialCondition> testing_initial_condition(body);
-        /*InteractionDynamics<relax_dynamics::CheckConsistencyRealization> check_skgc_realization(body_inner, true);
-        InteractionDynamics<relax_dynamics::CheckReverseConsistencyRealization> check_rkgc_realization(body_inner, true);
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_ac(average_domain, "ACTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_as(average_domain, "ASTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_c(average_domain, "CTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_ab(average_domain, "ABTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_ar(average_domain, "ARTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_b(average_domain, "BTERMNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>> 
-            calculate_body_average_nkgc(average_domain, "NKGCNORM");
-        ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>>
-            calculate_body_average_prerror(average_domain, "PRERROR");*/
         /* Update the kinetic energy for stopping the relaxation. */
         SimpleDynamics<relax_dynamics::UpdateParticleKineticEnergy> update_body_kinetic_energy(body_inner);
         ReduceDynamics<Average<QuantitySummationPartly<Real, BodyPartByParticle>>> 
             calculate_body_average_kinetic_energy(average_domain, "ParticleKineticEnergy");
         ReduceDynamics<QuantityMaximumPartly<Real, BodyPartByParticle>> 
             calculate_body_maximum_kinetic_energy(average_domain, "ParticleKineticEnergy");
-        //std::string filefullpath_error_analysis = io_environment.output_folder_ + "/" + "error_analysis.dat";
-        //std::ofstream out_file_error_analysis(filefullpath_error_analysis.c_str(), std::ios::app);
         //----------------------------------------------------------------------
         //	Particle relaxation starts here.
         //----------------------------------------------------------------------
@@ -186,31 +135,6 @@ int main(int ac, char *av[])
         Real body_maximum_kinetic_energy = 100.0;
         Real last_body_maximum_kinetic_energy = 100;
         Real dt = 1.0;
-        /*Real ac_term = 0;
-        Real as_term = 0;
-        Real c_term = 0;
-        Real ab_term = 0;
-        Real ar_term = 0;
-        Real b_term = 0;
-        Real nkgc_norm = 0;
-        Real pr_error = 0;
-
-        /* Initial error analysis */
-        /*correction_matrix.exec();
-        check_skgc_realization.exec();
-        check_rkgc_realization.exec();
-        ac_term = calculate_body_average_ac.exec();
-        as_term = calculate_body_average_as.exec();
-        c_term = calculate_body_average_c.exec();
-        ab_term = calculate_body_average_ab.exec();
-        ar_term = calculate_body_average_ar.exec();
-        b_term = calculate_body_average_b.exec();
-        pr_error = calculate_body_average_prerror.exec();
-        nkgc_norm = calculate_body_average_nkgc.exec();
-        out_file_error_analysis << std::fixed << std::setprecision(12) << ite << "   " <<
-            pr_error << " " << nkgc_norm << " " <<
-            ac_term << " " << as_term << " " << c_term << " " <<
-            ab_term << " " << ar_term << " " << b_term << "\n";*/
 
         GlobalStaticVariables::physical_time_ = ite;
         while (body_maximum_kinetic_energy > 1e-4)
@@ -221,30 +145,6 @@ int main(int ac, char *av[])
 
             if (ite % 2000 == 0)
             {
-                /* testing_initial_condition.exec();
-                correction_matrix.exec();
-                check_skgc_realization.exec();
-                check_rkgc_realization.exec();
-                update_body_kinetic_energy.exec();
-                body_average_kinetic_energy = calculate_body_average_kinetic_energy.exec();
-                body_maximum_kinetic_energy = calculate_body_maximum_kinetic_energy.exec();
-                ac_term = calculate_body_average_ac.exec();
-                as_term = calculate_body_average_as.exec();
-                c_term = calculate_body_average_c.exec();
-                ab_term = calculate_body_average_ab.exec();
-                ar_term = calculate_body_average_ar.exec();
-                b_term = calculate_body_average_b.exec();
-                pr_error = calculate_body_average_prerror.exec();
-                std::cout << std::fixed << std::setprecision(9) << "The 0th relaxation steps for the body N = " << ite << "\n";
-                std::cout << "Body: "
-                    << " Average: " << body_average_kinetic_energy
-                    << " Maximum: " << body_maximum_kinetic_energy << std::endl;
-                out_file_error_analysis << std::fixed << std::setprecision(12) << ite << "   " <<
-                    pr_error << " " << nkgc_norm << " " <<
-                    ac_term << " " << as_term << " " << c_term << " " <<
-                    ab_term << " " << ar_term << " " << b_term << "\n";
-                write_body_to_vtp.writeToFile(ite);*/
-
                 update_body_kinetic_energy.exec();
                 body_average_kinetic_energy = calculate_body_average_kinetic_energy.exec();
                 body_maximum_kinetic_energy = calculate_body_maximum_kinetic_energy.exec();
@@ -254,7 +154,7 @@ int main(int ac, char *av[])
                     << " Maximum: " << body_maximum_kinetic_energy << std::endl;
                 
 
-               /* if (body_maximum_kinetic_energy > last_body_maximum_kinetic_energy)
+               if (body_maximum_kinetic_energy > last_body_maximum_kinetic_energy)
                 {
                     dt = 0.99 * dt;
                 }
@@ -262,9 +162,9 @@ int main(int ac, char *av[])
                 {
                     dt = 1.01 * dt;
                 }
-                last_body_maximum_kinetic_energy = body_maximum_kinetic_energy;*/
+                last_body_maximum_kinetic_energy = body_maximum_kinetic_energy;
                 std::cout << "dt ratio is " << dt << std::endl;
-                //write_body_to_vtp.writeToFile(ite);
+                write_body_to_vtp.writeToFile(ite);
             }
         }
         ite++;

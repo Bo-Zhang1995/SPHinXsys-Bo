@@ -186,24 +186,24 @@ void BaseVorticityWithWall<VorticityInnerType>::interaction(size_t index_i, Real
     this->vorticity_[index_i] += vorticity;
 }
 //=================================================================================================//
-template <class AngleVorticityInnerType>
-void BaseAngleVorticityWithWall<AngleVorticityInnerType>::interaction(size_t index_i, Real dt)
-{
-    AngleVorticityInnerType::interaction(index_i, dt);
-    Mat3d velocity_gradient = Mat3d::Zero();
-    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
-    {
-        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
-        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
-        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
-        {
-            size_t index_j = contact_neighborhood.j_[n];
-            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
-            velocity_gradient += vel_diff * contact_neighborhood.e_ij_[n].transpose() * contact_neighborhood.dW_ijV_j_[n];
-        }
-    }
-    this->velocity_gradient_[index_i] += velocity_gradient.transpose();
-}
+//template <class AngleVorticityInnerType>
+//void BaseAngleVorticityWithWall<AngleVorticityInnerType>::interaction(size_t index_i, Real dt)
+//{
+//    AngleVorticityInnerType::interaction(index_i, dt);
+//    Mat3d velocity_gradient = Mat3d::Zero();
+//    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
+//    {
+//        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
+//        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
+//        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
+//        {
+//            size_t index_j = contact_neighborhood.j_[n];
+//            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
+//            velocity_gradient += vel_diff * contact_neighborhood.e_ij_[n].transpose() * contact_neighborhood.dW_ijV_j_[n];
+//        }
+//    }
+//    this->velocity_gradient_[index_i] += velocity_gradient.transpose();
+//}
 //=================================================================================================//
 template <class BaseIntegration1stHalfType>
 void BaseIntegration1stHalfWithWall<BaseIntegration1stHalfType>::

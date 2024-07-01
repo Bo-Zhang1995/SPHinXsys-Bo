@@ -224,6 +224,10 @@ void CheckL2NormError::interaction(size_t index_i, Real dt)
     //L2_NKGC_[index_i] = (NKGC_error_ - Vec2d(-20 * pos_[index_i][0] * exp(-pos_[index_i][0] * pos_[index_i][0] / 0.1), 0)).norm();
     //L2_SKGC_[index_i] = (SKGC_error_ - Vec2d(-20 * pos_[index_i][0] * exp(-pos_[index_i][0] * pos_[index_i][0] / 0.1), 0)).norm();
     //L2_CKGC_[index_i] = (CKGC_error_ - Vec2d(-20 * pos_[index_i][0] * exp(-pos_[index_i][0] * pos_[index_i][0] / 0.1), 0)).norm();
+
+    L2_NKGC_[index_i] = (NKGC_error_ - Vec2d(1, 0)).norm();
+    L2_SKGC_[index_i] = (SKGC_error_ - Vec2d(1, 0)).norm();
+    L2_CKGC_[index_i] = (CKGC_error_ - Vec2d(1, 0)).norm();
 };
 //=================================================================================================//
 CheckConsistencyRealization::

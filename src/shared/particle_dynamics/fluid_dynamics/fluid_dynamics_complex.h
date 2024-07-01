@@ -159,18 +159,18 @@ using VorticityWithWall = BaseVorticityWithWall<VorticityInner>;
  * @class AngleVorticityWithWall
  * @brief compute vorticity in the fluid field.
  */
-template <class AngleVorticityInnerType>
-class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseAngleVorticityWithWall(Args &&...args)
-        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseAngleVorticityWithWall() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
+//template <class AngleVorticityInnerType>
+//class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
+//{
+//public:
+//    template <typename... Args>
+//    BaseAngleVorticityWithWall(Args &&...args)
+//        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
+//    virtual ~BaseAngleVorticityWithWall() {};
+//
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//};
+//using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
 
 /**
  * @class BaseIntegration1stHalfWithWall
