@@ -1,18 +1,12 @@
 /**
  * @file 	taylor_couette_flow.cpp
- * @brief 	This is the one of the basic test cases for SPH Eulerian formulation.
+ * @brief 	This is the one of the 3D cases for SPH Eulerian formulation.
  * @details 3D eulerian_taylor_couette_flow example.
  * @author 	Bo Zhang
  */
-#include "general_eulerian_fluid_dynamics.hpp" //eulerian classes for fluid.
-#include "sphinxsys.h" //SPHinXsys Library.
+#include "general_eulerian_fluid_dynamics.hpp"
+#include "sphinxsys.h" 
 using namespace SPH;
-//----------------------------------------------------------------------
-//	Setting for the second geometry.
-//	To use this, please commenting the setting for the first geometry.
-//----------------------------------------------------------------------
-std::string full_path_to_file_fluid = "./input/case.stl";
-std::string full_path_to_file_wall = "./input/wall.stl";
 //----------------------------------------------------------------------
 //	Basic geometry parameters and numerical setup.
 //----------------------------------------------------------------------
@@ -20,13 +14,12 @@ Real R_in = 1.5;   /* Inner radius. */
 Real R_out = 2.5;  /* Outer radius. */
 Real L = 4.2;
 Real d = R_out - R_in; /* the radius difference. */
-Real resolution_ref = d / 40;
+Real resolution_ref = d / 10;
 Real BW = resolution_ref * 5;
-Real distance = 0.2;
 /** Domain bounds of the system. */
-BoundingBox system_domain_bounds(Vec3d(-R_out - distance, -R_out - distance, -0.5 * L - distance), Vec3d(R_out + distance, R_out + distance, 0.5 * L + distance));
+BoundingBox system_domain_bounds(Vec3d(-R_out - BW, -R_out - BW, -0.5 * L - BW), Vec3d(R_out + BW, R_out + BW, 0.5 * L + BW));
 int resolution(10);
-Vec3d translation(0.0, 0.0, 0.0);
+Vecd translation(0, 0, 0);
 Real scaling = 1;
 //----------------------------------------------------------------------
 //	Material properties of the fluid.
@@ -38,14 +31,31 @@ Real c_f = 10 * U_max;                      /**< Reference sound speed. */
 Real Re = 150;                              /**< Reynolds number. */
 Real mu_f = rho0_f * U_f * R_in / Re;       /**< Dynamics viscosity. */
 //----------------------------------------------------------------------
+//	Setting for the second geometry.
+//	To use this, please commenting the setting for the first geometry.
+//----------------------------------------------------------------------
+std::string full_path_to_file = "./input/case.stl";
+//----------------------------------------------------------------------
 //	Cases-dependent geometries
 //----------------------------------------------------------------------
+class InnerColumn : public ComplexShape
+{
+public:
+	explicit InnerColumn(const std::string& shape_name) : ComplexShape(shape_name)
+	{
+		Vecd translation_column(0.0, 0.0, 0.0);
+		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
+	}
+};
+
 class FluidColumn : public ComplexShape
 {
 public:
 	explicit FluidColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		add<TriangleMeshShapeSTL>(full_path_to_file_fluid, translation, scaling);
+		Vecd translation_column(0.0, 0.0, 0.0);
+		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column, "OuterBoundary");
+		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
 	}
 };
 
@@ -54,10 +64,13 @@ class OuterColumn : public ComplexShape
 public:
 	explicit OuterColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		add<TriangleMeshShapeSTL>(full_path_to_file_wall, translation, scaling);
+		Vecd translation_column(0.0, 0.0, 0.0);
+		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out + BW, 0.5 * L + BW, resolution, translation_column);
+		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column);
+		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
+		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in - BW, 0.5 * L - BW, resolution, translation_column);
 	}
 };
-
 //----------------------------------------------------------------------
 //	Application dependent initial condition
 //----------------------------------------------------------------------
@@ -97,7 +110,7 @@ int main(int ac, char* av[])
 	//----------------------------------------------------------------------
 	SPHSystem sph_system(system_domain_bounds, resolution_ref);
 	// Tag for run particle relaxation for tHe initial body fitted distribution.
-	sph_system.setRunParticleRelaxation(false);
+	sph_system.setRunParticleRelaxation(true);
 	// Tag for computation start with relaxed body fitted particles distribution.
 	sph_system.setReloadParticles(true);
 	/** Set the starting time. */
@@ -109,9 +122,8 @@ int main(int ac, char* av[])
 	//----------------------------------------------------------------------
 	FluidBody water_body(sph_system, makeShared<FluidColumn>("WaterBody"));
 	water_body.defineBodyLevelSetShape()->writeLevelSet(io_environment);
-	water_body.defineAdaptationRatios(0.95, 1.0);
+	water_body.defineAdaptationRatios(1.3, 1.0);
 	water_body.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f, mu_f);
-	//water_body.generateParticles<ParticleGeneratorLattice>();
 	(!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
 		? water_body.generateParticles<ParticleGeneratorReload>(io_environment, water_body.getName())
 		: water_body.generateParticles<ParticleGeneratorLattice>();
@@ -124,7 +136,6 @@ int main(int ac, char* av[])
 	outer_column.defineBodyLevelSetShape()->writeLevelSet(io_environment);
 	outer_column.defineAdaptationRatios(1.15, 1.0);
 	outer_column.defineParticlesAndMaterial<SolidParticles, Solid>();
-	//outer_column.generateParticles<ParticleGeneratorLattice>();
 	(!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
 		? outer_column.generateParticles<ParticleGeneratorReload>(io_environment, outer_column.getName())
 		: outer_column.generateParticles<ParticleGeneratorLattice>();
@@ -145,8 +156,9 @@ int main(int ac, char* av[])
 	if (sph_system.RunParticleRelaxation())
 	{
 		/** body topology only for particle relaxation */
-		InnerRelation water_block_inner(water_body);
+		ComplexRelation water_block_complex(water_body, { &outer_column });
 		InnerRelation boundary_inner(outer_column);
+		ComplexRelation column_block_complex(outer_column, { &water_body });
 		//----------------------------------------------------------------------
 		//	Methods used for particle relaxation.
 		//----------------------------------------------------------------------
@@ -159,16 +171,15 @@ int main(int ac, char* av[])
 		/** Write the particle reload files. */
 		ReloadParticleIO write_water_particle_reload(io_environment, water_body);
 		ReloadParticleIO write_boundary_particle_reload(io_environment, outer_column);
-
 		/* Relaxation method: including based on the 0th and 1st order consistency. */
 		InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_complex_water(water_block_complex);
 		InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_complex_column(column_block_complex);
-		relax_dynamics::RelaxationStepInnerImplicit<CorrectionMatrixRelaxation> relaxation_water_inner(water_block_inner, true);
-		relax_dynamics::RelaxationStepInnerImplicit<CorrectionMatrixRelaxation> relaxation_boundary_inner(boundary_inner, true);
+		relax_dynamics::RelaxationStepComplexImplicit relaxation_water_inner(water_block_complex, "OuterBoundary");
+		relax_dynamics::RelaxationStepInnerImplicit relaxation_boundary_inner(boundary_inner, true);
 		SimpleDynamics<relax_dynamics::UpdateParticleKineticEnergy> update_water_block_kinetic_energy(water_block_inner);
 		ReduceDynamics<Average<QuantitySummation<Real>>> calculate_water_block_average_kinetic_energy(water_body, "ParticleKineticEnergy");
 		ReduceDynamics<QuantityMaximum<Real>> calculate_water_block_maximum_kinetic_energy(water_body, "ParticleKineticEnergy");
-		//water_body.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
+		water_body.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
 		//----------------------------------------------------------------------
 		//	Particle relaxation starts here.
 		//----------------------------------------------------------------------
@@ -190,9 +201,7 @@ int main(int ac, char* av[])
 		GlobalStaticVariables::physical_time_ = ite;
 		while (ite < 10000)
 		{
-			kernel_correction_complex_column.exec();
 			relaxation_boundary_inner.exec();
-			kernel_correction_complex_water.exec();
 			relaxation_water_inner.exec();
 
 			ite += 1;
@@ -318,7 +327,6 @@ int main(int ac, char* av[])
 		}
 
 		TickCount t2 = TickCount::now();
-		compute_vorticity.exec();
 		compute_vorticity_xyz.exec();
 		body_states_recording.writeToFile();
 		TickCount t3 = TickCount::now();
