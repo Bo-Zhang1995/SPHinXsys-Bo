@@ -425,7 +425,7 @@ template <class RelaxationType = PressureRelaxation>
 class RelaxationComplexImplicit : public LocalDynamics, public RelaxDataDelegateComplex
 {
 public:
-    explicit RelaxationComplexImplicit(ComplexRelation& complex_relation, const std::string& shape_name);
+    explicit RelaxationComplexImplicit(ComplexRelation& complex_relation);
     virtual ~RelaxationComplexImplicit() {};
     void interaction(size_t index_i, Real dt = 0.0);
 
@@ -468,8 +468,7 @@ template <class RelaxationType = PressureRelaxation>
 class RelaxationStepComplexImplicit : public BaseDynamics<void>
 {
 public:
-    explicit RelaxationStepComplexImplicit(ComplexRelation& complex_relation, const std::string& shape_name,
-                                           bool level_set_correction = false);
+    explicit RelaxationStepComplexImplicit(ComplexRelation& complex_relation, bool level_set_correction = false);
     virtual ~RelaxationStepComplexImplicit() {};
     SimpleDynamics<ShapeSurfaceBounding>& SurfaceBounding() { return surface_bounding_; };
     virtual void exec(Real dt = 0.0) override;

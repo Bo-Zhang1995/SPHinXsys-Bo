@@ -41,7 +41,8 @@ BaseViscousAccelerationInner::BaseViscousAccelerationInner(BaseInnerRelation &in
     : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
       rho_(particles_->rho_), vel_(particles_->vel_), acc_prior_(particles_->acc_prior_),
       mu_(DynamicCast<Fluid>(this, particles_->getBaseMaterial()).ReferenceViscosity()),
-      smoothing_length_(sph_body_.sph_adaptation_->ReferenceSmoothingLength()) {}
+      smoothing_length_(sph_body_.sph_adaptation_->ReferenceSmoothingLength()),
+      distance_from_wall_(*particles_->getVariableByName<Vecd>("DistanceFromWall")) {}
 //=================================================================================================//
 AcousticTimeStepSize::AcousticTimeStepSize(SPHBody &sph_body, Real acousticCFL)
     : LocalDynamicsReduce<Real, ReduceMax>(sph_body, Real(0)),
@@ -93,23 +94,23 @@ Real AdvectionTimeStepSize::reduce(size_t index_i, Real dt)
     return AdvectionTimeStepSizeForImplicitViscosity::reduce(index_i, dt);
 }
 //=================================================================================================//
-VorticityInner::VorticityInner(BaseInnerRelation &inner_relation)
-    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
-      vel_(particles_->vel_)
-{
-    particles_->registerVariable(vorticity_, "Vorticity");
-    particles_->addVariableToWrite<AngularVecd>("Vorticity");
-}
-//=================================================================================================//
-AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
-    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
-    pos_(particles_->pos_), vel_(particles_->vel_)
-{
-    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
-    particles_->addVariableToWrite<Real>("ThetaVorticity");
-    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
-    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
-}
+//VorticityInner::VorticityInner(BaseInnerRelation &inner_relation)
+//    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
+//      vel_(particles_->vel_)
+//{
+//    particles_->registerVariable(vorticity_, "Vorticity");
+//    particles_->addVariableToWrite<AngularVecd>("Vorticity");
+//}
+////=================================================================================================//
+//AngleVorticityInner::AngleVorticityInner(BaseInnerRelation& inner_relation)
+//    : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
+//    pos_(particles_->pos_), vel_(particles_->vel_)
+//{
+//    particles_->registerVariable(theta_vorticity_, "ThetaVorticity");
+//    particles_->addVariableToWrite<Real>("ThetaVorticity");
+//    particles_->registerVariable(velocity_gradient_, "VelocityGradient");
+//    particles_->addVariableToWrite<Mat3d>("VelocityGradient");
+//}
 //=================================================================================================//
 BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
     : LocalDynamics(inner_relation.getSPHBody()), FluidDataInner(inner_relation),
@@ -119,6 +120,8 @@ BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
       Vol_(particles_->Vol_), mass_(particles_->mass_),
       pos_(particles_->pos_), vel_(particles_->vel_),
       acc_(particles_->acc_), acc_prior_(particles_->acc_prior_),
+      smoothing_length_(sph_body_.sph_adaptation_->ReferenceSmoothingLength()),
+      distance_from_wall_(*particles_->getVariableByName<Vecd>("DistanceFromWall")),
       B_(*this->particles_->template registerSharedVariable<Matd>("KernelCorrectionMatrix", Matd::Identity())) {}
 //=================================================================================================//
 Oldroyd_BIntegration1stHalf ::

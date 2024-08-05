@@ -14,13 +14,16 @@ Real R_in = 1.5;   /* Inner radius. */
 Real R_out = 2.5;  /* Outer radius. */
 Real L = 4.2;
 Real d = R_out - R_in; /* the radius difference. */
-Real resolution_ref = d / 10;
-Real BW = resolution_ref * 5;
+Real resolution_ref = d / 60;
+Real BW = resolution_ref * 4;
 /** Domain bounds of the system. */
 BoundingBox system_domain_bounds(Vec3d(-R_out - BW, -R_out - BW, -0.5 * L - BW), Vec3d(R_out + BW, R_out + BW, 0.5 * L + BW));
-int resolution(10);
-Vecd translation(0, 0, 0);
+Vecd translation(0.0, 0.0, 0.0);
 Real scaling = 1;
+//----------------------------------------------------------------------
+//	Set the file path to the data file.
+//----------------------------------------------------------------------
+std::string full_path_to_file = "./input/case.stl";
 //----------------------------------------------------------------------
 //	Material properties of the fluid.
 //----------------------------------------------------------------------
@@ -31,31 +34,14 @@ Real c_f = 10 * U_max;                      /**< Reference sound speed. */
 Real Re = 150;                              /**< Reynolds number. */
 Real mu_f = rho0_f * U_f * R_in / Re;       /**< Dynamics viscosity. */
 //----------------------------------------------------------------------
-//	Setting for the second geometry.
-//	To use this, please commenting the setting for the first geometry.
-//----------------------------------------------------------------------
-std::string full_path_to_file = "./input/case.stl";
-//----------------------------------------------------------------------
 //	Cases-dependent geometries
 //----------------------------------------------------------------------
-class InnerColumn : public ComplexShape
-{
-public:
-	explicit InnerColumn(const std::string& shape_name) : ComplexShape(shape_name)
-	{
-		Vecd translation_column(0.0, 0.0, 0.0);
-		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
-	}
-};
-
 class FluidColumn : public ComplexShape
 {
 public:
 	explicit FluidColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		Vecd translation_column(0.0, 0.0, 0.0);
-		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column, "OuterBoundary");
-		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
+		add<TriangleMeshShapeSTL>(full_path_to_file, translation, 1.0);
 	}
 };
 
@@ -64,11 +50,8 @@ class OuterColumn : public ComplexShape
 public:
 	explicit OuterColumn(const std::string& shape_name) : ComplexShape(shape_name)
 	{
-		Vecd translation_column(0.0, 0.0, 0.0);
-		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out + BW, 0.5 * L + BW, resolution, translation_column);
-		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_out, 0.5 * L, resolution, translation_column);
-		add<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in, 0.5 * L, resolution, translation_column);
-		subtract<TriangleMeshShapeCylinder>(SimTK::dUnitVec3(0.0, 0.0, 1.0), R_in - BW, 0.5 * L - BW, resolution, translation_column);
+		add<ExtrudeShape<TriangleMeshShapeSTL>>(BW, full_path_to_file, translation, scaling);
+		subtract<TriangleMeshShapeSTL>(full_path_to_file, translation, scaling);
 	}
 };
 //----------------------------------------------------------------------
@@ -112,7 +95,7 @@ int main(int ac, char* av[])
 	// Tag for run particle relaxation for tHe initial body fitted distribution.
 	sph_system.setRunParticleRelaxation(true);
 	// Tag for computation start with relaxed body fitted particles distribution.
-	sph_system.setReloadParticles(true);
+	sph_system.setReloadParticles(false);
 	/** Set the starting time. */
 	GlobalStaticVariables::physical_time_ = 0.0;
 	IOEnvironment io_environment(sph_system);
@@ -129,9 +112,7 @@ int main(int ac, char* av[])
 		: water_body.generateParticles<ParticleGeneratorLattice>();
 	water_body.addBodyStateForRecording<Real>("Density");
 	water_body.addBodyStateForRecording<Vecd>("Position");
-	/**
-	 * @brief 	Particle and body creation of wall boundary.
-	 */
+
 	SolidBody outer_column(sph_system, makeShared<OuterColumn>("OuterColumn"));
 	outer_column.defineBodyLevelSetShape()->writeLevelSet(io_environment);
 	outer_column.defineAdaptationRatios(1.15, 1.0);
@@ -147,6 +128,7 @@ int main(int ac, char* av[])
 	//	Basically the the range of bodies to build neighbor particle lists.
 	//----------------------------------------------------------------------
 	InnerRelation water_block_inner(water_body);
+	ContactRelation water_wall_contact(water_body, { &outer_column });
 	ComplexRelation water_block_complex(water_body, { &outer_column });
 	ComplexRelation water_block_complex_corrected(water_body, { &outer_column });
 	ComplexRelation column_block_complex(outer_column, { &water_body });
@@ -166,15 +148,15 @@ int main(int ac, char* av[])
 		SimpleDynamics<RandomizeParticlePosition> random_water_body_particles(water_body);
 		SimpleDynamics<RandomizeParticlePosition> random_boundary_particles(outer_column);
 		/** Write the body state to Vtp file. */
-		BodyStatesRecordingToPlt write_water_body_to_vtp(io_environment, { &water_body });
-		BodyStatesRecordingToPlt write_boundary_body_to_vtp(io_environment, { &outer_column });
+		BodyStatesRecordingToPlt write_water_body_to_plt(io_environment, { &water_body });
+		BodyStatesRecordingToPlt write_boundary_body_to_plt(io_environment, { &outer_column });
 		/** Write the particle reload files. */
 		ReloadParticleIO write_water_particle_reload(io_environment, water_body);
 		ReloadParticleIO write_boundary_particle_reload(io_environment, outer_column);
 		/* Relaxation method: including based on the 0th and 1st order consistency. */
 		InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_complex_water(water_block_complex);
 		InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_complex_column(column_block_complex);
-		relax_dynamics::RelaxationStepComplexImplicit relaxation_water_inner(water_block_complex, "OuterBoundary");
+		relax_dynamics::RelaxationStepComplexImplicit relaxation_water_inner(water_block_complex);
 		relax_dynamics::RelaxationStepInnerImplicit relaxation_boundary_inner(boundary_inner, true);
 		SimpleDynamics<relax_dynamics::UpdateParticleKineticEnergy> update_water_block_kinetic_energy(water_block_inner);
 		ReduceDynamics<Average<QuantitySummation<Real>>> calculate_water_block_average_kinetic_energy(water_body, "ParticleKineticEnergy");
@@ -189,7 +171,8 @@ int main(int ac, char* av[])
 		sph_system.initializeSystemConfigurations();
 		relaxation_water_inner.SurfaceBounding().exec();
 		relaxation_boundary_inner.SurfaceBounding().exec();
-		write_water_body_to_vtp.writeToFile(0);
+		write_boundary_body_to_plt.writeToFile(0);
+		write_water_body_to_plt.writeToFile(0);
 		Real water_block_average_energy = 100.0;
 		Real water_block_maximum_energy = 100.0;
 		Real last_water_block_maximum_energy = 100.0;
@@ -199,7 +182,7 @@ int main(int ac, char* av[])
 		TickCount t1 = TickCount::now();
 		int ite = 0; //iteration step for the total relaxation step.
 		GlobalStaticVariables::physical_time_ = ite;
-		while (ite < 10000)
+		while (ite < 5000)
 		{
 			relaxation_boundary_inner.exec();
 			relaxation_water_inner.exec();
@@ -213,8 +196,8 @@ int main(int ac, char* av[])
 				std::cout << std::fixed << std::setprecision(9) << "Relaxation steps N = " << ite << "\n";
 				std::cout << "Body: " << " Maximum: " << water_block_maximum_energy << " Average: " << water_block_average_energy << std::endl;
 
-				write_water_body_to_vtp.writeToFile(ite);
-				write_boundary_body_to_vtp.writeToFile(ite);
+				write_water_body_to_plt.writeToFile(ite);
+				write_boundary_body_to_plt.writeToFile(ite);
 			}
 		}
 
@@ -223,8 +206,8 @@ int main(int ac, char* av[])
 		std::cout << "The physics relaxation process of the cylinder finish !" << std::endl;
 
 		ite++;
-		write_water_body_to_vtp.writeToFile(ite);
-		write_boundary_body_to_vtp.writeToFile(ite);
+		write_water_body_to_plt.writeToFile(ite);
+		write_boundary_body_to_plt.writeToFile(ite);
 		write_boundary_particle_reload.writeToFile(0);
 		write_water_particle_reload.writeToFile(0);
 
@@ -239,22 +222,26 @@ int main(int ac, char* av[])
 	//	Note that there may be data dependence on the constructors of these methods.
 	//----------------------------------------------------------------------
 	/** Initial condition with momentum and energy field */
-	SimpleDynamics<RotatingColumnInitialCondition> solid_initial_condition(outer_column);
+	SimpleDynamics<RotatingColumnInitialCondition> boundary_velocity_initial_condition(outer_column);
 	SimpleDynamics<NormalDirectionFromBodyShape> boundary_normal_direction_outer(outer_column);
 	/** Initialize a time step. */
 	SimpleDynamics<TimeStepInitialization> time_step_initialization(water_body);
+	/** Initialize the correction matrix and corrected configuration. */
 	InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_maxtrix(water_block_complex);
 	InteractionWithUpdate<KernelCorrectionMatrixComplex> kernel_correction_maxtrix_corrected(water_block_complex_corrected);
 	InteractionDynamics<KernelGradientCorrectionComplex> kernel_gradient_update(kernel_correction_maxtrix_corrected);
 	/** Time step size with considering sound wave speed. */
-	ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_body);
+	ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> get_fluid_time_step_size(water_body); //reference paper use 0.05.
+	InteractionDynamics<fluid_dynamics::DistanceFromWall> distance_to_wall(water_block_complex);
+	
+	InteractionDynamics<fluid_dynamics::BoundingFromWall> bounding_distance(water_block_complex);
 	InteractionDynamics<fluid_dynamics::ViscousAccelerationWithWall> viscous_acceleration(water_block_complex_corrected);
 	/** Pressure relaxation algorithm by using verlet time stepping. */
-	InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfHLLERiemannWithWall> pressure_relaxation(water_block_complex);
-	InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfHLLERiemannWithWall> density_and_energy_relaxation(water_block_complex);
+	InteractionWithUpdate<fluid_dynamics::ICEIntegration1stHalfHLLERiemannWithWall> pressure_relaxation(water_block_complex); //Here the correction is in the dynamics.
+	InteractionWithUpdate<fluid_dynamics::ICEIntegration2ndHalfHLLERiemannWithWall> density_and_energy_relaxation(water_block_complex); //Here the correction is in the dynamcis.
 	/** Computing vorticity in the flow. */
-	InteractionDynamics<fluid_dynamics::VorticityWithWall> compute_vorticity_xyz(water_block_complex_corrected);
-	InteractionWithUpdate<fluid_dynamics::AngleVorticityWithWall> compute_vorticity(water_block_complex_corrected);
+	//InteractionDynamics<fluid_dynamics::VorticityWithWall> compute_vorticity_xyz(water_block_complex_corrected); //correction should be done in the dynamcis.
+	//InteractionWithUpdate<fluid_dynamics::AngleVorticityWithWall> compute_vorticity(water_block_complex_corrected); //correction should be done in the dynamics.
 	water_body.addBodyStateForRecording<Real>("ThetaVorticity");
 	water_body.addBodyStateForRecording<Mat3d>("VelocityGradient");
 	water_body.addBodyStateForRecording<AngularVecd>("Vorticity");
@@ -271,8 +258,10 @@ int main(int ac, char* av[])
 	//----------------------------------------------------------------------
 	sph_system.initializeSystemCellLinkedLists();
 	sph_system.initializeSystemConfigurations();
-	solid_initial_condition.exec();
+	boundary_velocity_initial_condition.exec();
 	boundary_normal_direction_outer.exec();
+	distance_to_wall.exec();
+	bounding_distance.exec();
 	kernel_correction_maxtrix.exec();
 	kernel_correction_maxtrix_corrected.exec();
 	kernel_gradient_update.exec();
@@ -283,7 +272,7 @@ int main(int ac, char* av[])
 	size_t number_of_iterations = 0;
 	int screen_output_interval = 100;
 	int restart_output_interval = screen_output_interval * 10;
-	Real End_Time = 1000.0; /**< End time. */
+	Real End_Time = 300.0; /**< End time. */
 	Real D_Time = 10.0;	 /**< Time stamps for output of body states. */
 	/** statistics for computing CPU time. */
 	TickCount t1 = TickCount::now();

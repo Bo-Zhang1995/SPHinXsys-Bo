@@ -42,8 +42,102 @@ namespace SPH
 {
 namespace fluid_dynamics
 {
+typedef DataDelegateComplex<BaseParticles, BaseParticles> FluidWithWallData;
 typedef DataDelegateContact<BaseParticles, SolidParticles, DataDelegateEmptyBase> FluidWallData;
 typedef DataDelegateContact<BaseParticles, SolidParticles> FSIContactData;
+
+class NearWallDistance : public LocalDynamics, public FluidWithWallData
+{
+public:
+    explicit NearWallDistance(ComplexRelation& complex_relation):
+        LocalDynamics(complex_relation.getSPHBody()), FluidWithWallData(complex_relation),
+        spacing_ref_(sph_body_.sph_adaptation_->ReferenceSpacing()),
+        distance_default_(100.0 * spacing_ref_),
+        pos_(*particles_->getVariableByName<Vecd>("Position"))
+    {
+        for (size_t k = 0; k != contact_particles_.size(); ++k)
+        {
+            wall_pos_.push_back(contact_particles_[k]->getVariableByName<Vecd>("Position"));
+            wall_n_.push_back(contact_particles_[k]->template getVariableByName<Vecd>("NormalDirection"));
+            wall_phi_.push_back(contact_particles_[k]->getVariableByName<Real>("SignedDistance"));
+        }
+    };
+    virtual ~NearWallDistance() {};
+
+protected:
+    Real spacing_ref_, distance_default_;
+
+    StdLargeVec<Vecd>& pos_;
+    StdVec<StdLargeVec<Vecd>*> wall_pos_, wall_n_;
+    StdVec<StdLargeVec<Real>*> wall_phi_;
+
+    void evaluateDistanceAndNormal(size_t index_i, Vecd& distance, Vecd& normal)
+    {
+        for (size_t k = 0; k < contact_configuration_.size(); ++k)
+        {
+            StdLargeVec<Vecd>& pos_k = *(wall_pos_[k]);
+            StdLargeVec<Vecd>& n_k = *(wall_n_[k]);
+            StdLargeVec<Real>& phi_k = *(wall_phi_[k]);
+            Neighborhood& contact_neighborhood = (*contact_configuration_[k])[index_i];
+            for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
+            {
+                size_t index_j = contact_neighborhood.j_[n];
+                Vecd temp = (pos_[index_i] - pos_k[index_j]) + phi_k[index_j] * n_k[index_j];
+                if (temp.squaredNorm() < distance.squaredNorm())
+                {
+                    distance = temp;       // more reliable distance
+                    normal = n_k[index_j]; // more reliable normal
+                }
+            }
+        }
+    }
+};
+
+class DistanceFromWall : public NearWallDistance
+{
+public:
+    explicit DistanceFromWall(ComplexRelation& complex_relation): 
+        NearWallDistance(complex_relation),
+        distance_from_wall_(*particles_->registerSharedVariable<Vecd>("DistanceFromWall")) {};
+    virtual ~DistanceFromWall() {};
+    void interaction(size_t index_i, Real dt = 0.0)
+    {
+        Vecd distance = distance_default_ * Vecd::Ones();
+        Vecd normal = Vecd::Ones();
+        NearWallDistance::evaluateDistanceAndNormal(index_i, distance, normal);
+        // prediction with regularization
+        Vecd normal_distance = distance.dot(normal) * normal;
+        Real limiter = SMIN(3.0 * (distance - normal_distance).norm() / spacing_ref_, 1.0);
+        distance_from_wall_[index_i] = (1.0 - limiter) * normal_distance + limiter * distance;
+    };
+
+protected:
+    StdLargeVec<Vecd>& distance_from_wall_;
+};
+
+class BoundingFromWall : public NearWallDistance
+{
+public:
+    explicit BoundingFromWall(ComplexRelation& complex_relation):
+        NearWallDistance(complex_relation), distance_min_(0.25 * spacing_ref_) {}
+    virtual ~BoundingFromWall() {};
+    void interaction(size_t index_i, Real dt = 0.0)
+    {
+        Vecd distance = distance_default_ * Vecd::Ones();
+        Vecd normal = Vecd::Ones();
+        NearWallDistance::evaluateDistanceAndNormal(index_i, distance, normal);
+        // bounding if the particle cross the wall
+        Real projection = distance.dot(normal);
+        if (projection < distance_min_)
+        {
+            pos_[index_i] += 0.5 * spacing_ref_ * normal - distance; // flip near wall distance
+        }
+    };
+
+protected:
+    Real distance_min_;
+};
+
 /**
  * @class InteractionWithWall
  * @brief Base class adding interaction with wall to general relaxation process
@@ -142,35 +236,35 @@ using ViscousAccelerationWithWall = BaseViscousAccelerationWithWall<ViscousAccel
  * @class VorticityWithWall
  * @brief compute vorticity in the fluid field.
  */
-template <class VorticityInnerType>
-class BaseVorticityWithWall : public InteractionWithWall<VorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseVorticityWithWall(Args &&...args)
-        : InteractionWithWall<VorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseVorticityWithWall() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-using VorticityWithWall = BaseVorticityWithWall<VorticityInner>;
+//template <class VorticityInnerType>
+//class BaseVorticityWithWall : public InteractionWithWall<VorticityInnerType>
+//{
+//public:
+//    template <typename... Args>
+//    BaseVorticityWithWall(Args &&...args)
+//        : InteractionWithWall<VorticityInnerType>(std::forward<Args>(args)...) {};
+//    virtual ~BaseVorticityWithWall() {};
+//
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//};
+//using VorticityWithWall = BaseVorticityWithWall<VorticityInner>;
 
 /**
  * @class AngleVorticityWithWall
  * @brief compute vorticity in the fluid field.
  */
-template <class AngleVorticityInnerType>
-class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseAngleVorticityWithWall(Args &&...args)
-        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseAngleVorticityWithWall() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
+//template <class AngleVorticityInnerType>
+//class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
+//{
+//public:
+//    template <typename... Args>
+//    BaseAngleVorticityWithWall(Args &&...args)
+//        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
+//    virtual ~BaseAngleVorticityWithWall() {};
+//
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//};
+//using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
 
 /**
  * @class BaseIntegration1stHalfWithWall

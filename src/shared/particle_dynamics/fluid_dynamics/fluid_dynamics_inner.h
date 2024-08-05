@@ -119,6 +119,7 @@ class BaseViscousAccelerationInner : public LocalDynamics, public FluidDataInner
   protected:
     StdLargeVec<Real> &rho_;
     StdLargeVec<Vecd> &vel_, &acc_prior_;
+    StdLargeVec<Vecd>& distance_from_wall_;
     Real mu_;
     Real smoothing_length_;
 };
@@ -229,20 +230,20 @@ class VorticityInner : public LocalDynamics, public FluidDataInner
  * @class AngleVorticity
  * @brief compute vorticity in the fluid field.
  */
-class AngleVorticityInner : public LocalDynamics, public FluidDataInner
-{
-public:
-    explicit AngleVorticityInner(BaseInnerRelation& inner_relation);
-    virtual ~AngleVorticityInner() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-    inline void update(size_t index_i, Real dt = 0.0);
-
-protected:
-    StdLargeVec<Vecd> &vel_, &pos_;
-    StdLargeVec<Real> theta_vorticity_;
-    StdLargeVec<Mat3d> velocity_gradient_;
-};
+//class AngleVorticityInner : public LocalDynamics, public FluidDataInner
+//{
+//public:
+//    explicit AngleVorticityInner(BaseInnerRelation& inner_relation);
+//    virtual ~AngleVorticityInner() {};
+//
+//    inline void interaction(size_t index_i, Real dt = 0.0);
+//    inline void update(size_t index_i, Real dt = 0.0);
+//
+//protected:
+//    StdLargeVec<Vecd> &vel_, &pos_;
+//    StdLargeVec<Real> theta_vorticity_;
+//    StdLargeVec<Mat3d> velocity_gradient_;
+//};
 
 /**
  * @class BaseIntegration
@@ -258,7 +259,9 @@ class BaseIntegration : public LocalDynamics, public FluidDataInner
     Fluid &fluid_;
     StdLargeVec<Real> &rho_, &p_, &drho_dt_, &Vol_, &mass_;
     StdLargeVec<Vecd> &pos_, &vel_, &acc_, &acc_prior_;
+    StdLargeVec<Vecd>& distance_from_wall_;
     StdLargeVec<Matd>& B_;
+    Real smoothing_length_;
 
 };
 

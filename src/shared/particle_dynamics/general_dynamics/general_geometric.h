@@ -47,6 +47,7 @@ class NormalDirectionFromBodyShape : public LocalDynamics, public GeneralDataDel
   protected:
     Shape &body_shape_;
     StdLargeVec<Vecd> &pos_, &n_, &n0_;
+    StdLargeVec<Real>& phi_, & phi0_;
 };
 
 /**

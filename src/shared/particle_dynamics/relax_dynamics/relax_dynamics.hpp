@@ -223,7 +223,7 @@ RelaxationStepInnerImplicit(BaseInnerRelation& inner_relation, bool level_set_co
 template <class RelaxationType>
 void RelaxationStepInnerImplicit<RelaxationType>::exec(Real dt)
 {
-    time_step_size_ =  20 * sqrt(get_time_step_.exec());
+    time_step_size_ =  SMIN(20 * sqrt(get_time_step_.exec()), 1.0);
     relaxation_evolution_inner_.exec(time_step_size_);
     /* For implicit scheme, the B relaxation should keep the same configuration
        calculation for both B calculating and updating positions. */
@@ -235,7 +235,7 @@ void RelaxationStepInnerImplicit<RelaxationType>::exec(Real dt)
 //=================================================================================================//
 template <class RelaxationType>
 RelaxationComplexImplicit<RelaxationType>::
-RelaxationComplexImplicit(ComplexRelation &complex_relation, const std::string& shape_name)
+RelaxationComplexImplicit(ComplexRelation &complex_relation)
     :LocalDynamics(complex_relation.getSPHBody()), RelaxDataDelegateComplex(complex_relation),
     kernel_(complex_relation.getSPHBody().sph_adaptation_->getKernel()),
     Vol_(particles_->Vol_), pos_(particles_->pos_), acc_(particles_->acc_),
@@ -251,8 +251,7 @@ RelaxationComplexImplicit(ComplexRelation &complex_relation, const std::string& 
     }
     particles_->addVariableToWrite<Real>("ImplicitResidual");
 
-    ComplexShape& complex_shape = DynamicCast<ComplexShape>(this, *this->sph_body_.body_shape_);
-    level_set_shape_ = DynamicCast<LevelSetShape>(this, complex_shape.getShapeByName(shape_name));
+    level_set_shape_ = DynamicCast<LevelSetShape>(this, sph_body_.body_shape_);
 };
 //=================================================================================================//
 template <class RelaxationType>
@@ -356,18 +355,17 @@ computeErrorAndParameters(size_t index_i, Real dt)
 //=================================================================================================//
 template <class RelaxationType>
 RelaxationStepComplexImplicit<RelaxationType>::
-RelaxationStepComplexImplicit(ComplexRelation& complex_relation, const std::string& shape_name, 
-                              bool level_set_correction)
+RelaxationStepComplexImplicit(ComplexRelation& complex_relation, bool level_set_correction)
     : BaseDynamics<void>(complex_relation.getSPHBody()), time_step_size_(0.01),
     real_body_(complex_relation.getInnerRelation().real_body_), complex_relation_(complex_relation), 
-    near_shape_surface_(*real_body_, shape_name), get_time_step_(*real_body_),
-    relaxation_evolution_complex_(complex_relation, shape_name), surface_bounding_(near_shape_surface_) {}
+    near_shape_surface_(*real_body_), get_time_step_(*real_body_),
+    relaxation_evolution_complex_(complex_relation), surface_bounding_(near_shape_surface_) {}
 //=================================================================================================//
 template <class RelaxationType>
 void RelaxationStepComplexImplicit<RelaxationType>::exec(Real dt)
 {
-    time_step_size_ = sqrt(get_time_step_.exec());
-    relaxation_evolution_complex_.exec(dt * time_step_size_);
+    time_step_size_ = SMIN(20 * sqrt(get_time_step_.exec()), 1.0);
+    relaxation_evolution_complex_.exec(time_step_size_);
     real_body_->updateCellLinkedList();
     complex_relation_.updateConfiguration();
 }

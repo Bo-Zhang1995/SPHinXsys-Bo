@@ -147,7 +147,7 @@ void BaseViscousAccelerationWithWall<ViscousAccelerationInnerType>::
 
     Real rho_i = this->rho_[index_i];
     const Vecd &vel_i = this->vel_[index_i];
-
+    const Vecd& distance_from_wall = this->distance_from_wall_[index_i];
     Vecd acceleration = Vecd::Zero();
     Vecd vel_derivative = Vecd::Zero();
     for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
@@ -158,8 +158,13 @@ void BaseViscousAccelerationWithWall<ViscousAccelerationInnerType>::
         {
             size_t index_j = contact_neighborhood.j_[n];
             Real r_ij = contact_neighborhood.r_ij_[n];
+            Vecd e_ij = contact_neighborhood.e_ij_[n];
 
-            vel_derivative = 2.0 * (vel_i - vel_ave_k[index_j]) / (r_ij + 0.01 * this->smoothing_length_);
+            Vecd distance_diff = distance_from_wall - r_ij * e_ij;
+            Real factor = 1.0 - distance_from_wall.dot(distance_diff) / distance_from_wall.squaredNorm();
+            vel_derivative = factor * (vel_i - vel_ave_k[index_j]) / (r_ij + 0.01 * this->smoothing_length_);
+            //std::cout << "distance" << distance_from_wall << std::endl;
+            //std::cout << "factor" << factor << std::endl;
             acceleration += 2.0 * this->mu_ * vel_derivative * contact_neighborhood.dW_ijV_j_[n] / rho_i;
         }
     }
@@ -167,43 +172,43 @@ void BaseViscousAccelerationWithWall<ViscousAccelerationInnerType>::
     this->acc_prior_[index_i] += acceleration;
 }
 //=================================================================================================//
-template <class VorticityInnerType>
-void BaseVorticityWithWall<VorticityInnerType>::interaction(size_t index_i, Real dt)
-{
-    VorticityInnerType::interaction(index_i, dt);
-    AngularVecd vorticity = ZeroData<AngularVecd>::value;
-    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
-    {
-        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
-        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
-        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
-        {
-            size_t index_j = contact_neighborhood.j_[n];
-            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
-            vorticity += getCrossProduct(vel_diff, contact_neighborhood.e_ij_[n]) * contact_neighborhood.dW_ijV_j_[n];
-        }
-    }
-    this->vorticity_[index_i] += vorticity;
-}
+//template <class VorticityInnerType>
+//void BaseVorticityWithWall<VorticityInnerType>::interaction(size_t index_i, Real dt)
+//{
+//    VorticityInnerType::interaction(index_i, dt);
+//    AngularVecd vorticity = ZeroData<AngularVecd>::value;
+//    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
+//    {
+//        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
+//        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
+//        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
+//        {
+//            size_t index_j = contact_neighborhood.j_[n];
+//            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
+//            vorticity += getCrossProduct(vel_diff, contact_neighborhood.e_ij_[n]) * contact_neighborhood.dW_ijV_j_[n];
+//        }
+//    }
+//    this->vorticity_[index_i] += vorticity;
+//}
 //=================================================================================================//
-template <class AngleVorticityInnerType>
-void BaseAngleVorticityWithWall<AngleVorticityInnerType>::interaction(size_t index_i, Real dt)
-{
-    AngleVorticityInnerType::interaction(index_i, dt);
-    Mat3d velocity_gradient = Mat3d::Zero();
-    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
-    {
-        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
-        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
-        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
-        {
-            size_t index_j = contact_neighborhood.j_[n];
-            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
-            velocity_gradient += vel_diff * contact_neighborhood.e_ij_[n].transpose() * contact_neighborhood.dW_ijV_j_[n];
-        }
-    }
-    this->velocity_gradient_[index_i] += velocity_gradient.transpose();
-}
+//template <class AngleVorticityInnerType>
+//void BaseAngleVorticityWithWall<AngleVorticityInnerType>::interaction(size_t index_i, Real dt)
+//{
+//    AngleVorticityInnerType::interaction(index_i, dt);
+//    Mat3d velocity_gradient = Mat3d::Zero();
+//    for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
+//    {
+//        StdLargeVec<Vecd>& vel_ave_k = *(this->wall_vel_ave_[k]);
+//        Neighborhood& contact_neighborhood = (*FluidWallData::contact_configuration_[k])[index_i];
+//        for (size_t n = 0; n != contact_neighborhood.current_size_; ++n)
+//        {
+//            size_t index_j = contact_neighborhood.j_[n];
+//            Vecd vel_diff = this->vel_[index_i] - vel_ave_k[index_j];
+//            velocity_gradient += vel_diff * contact_neighborhood.e_ij_[n].transpose() * contact_neighborhood.dW_ijV_j_[n];
+//        }
+//    }
+//    this->velocity_gradient_[index_i] += velocity_gradient.transpose();
+//}
 //=================================================================================================//
 template <class BaseIntegration1stHalfType>
 void BaseIntegration1stHalfWithWall<BaseIntegration1stHalfType>::

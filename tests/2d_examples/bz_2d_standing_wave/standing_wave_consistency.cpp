@@ -208,7 +208,7 @@ int main(int ac, char* av[])
     //	Define the methods for I/O operations, observations
     //	and regression tests of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp body_states_recording(io_environment, sph_system.real_bodies_);
+    BodyStatesRecordingToPlt body_states_recording(io_environment, sph_system.real_bodies_);
     RestartIO restart_io(io_environment, sph_system.real_bodies_);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<TotalMechanicalEnergy>>>
         write_water_mechanical_energy(io_environment, water_block, gravity_ptr);
@@ -244,7 +244,7 @@ int main(int ac, char* av[])
     int screen_output_interval = 100;
     int observation_sample_interval = screen_output_interval * 0.5;
     int restart_output_interval = screen_output_interval * 10;
-    Real end_time = 10.0;
+    Real end_time = 30.0;
     Real output_interval = 0.05;
     //----------------------------------------------------------------------
     //	Statistics for CPU time
@@ -284,8 +284,8 @@ int main(int ac, char* av[])
             Real relaxation_time = 0.0;
             Real acoustic_dt = 0.0;
 
-            while (relaxation_time < advection_dt)
-            {
+            //while (relaxation_time < advection_dt)
+            //{
                 /** inner loop for dual-time criteria time-stepping.  */
                 acoustic_dt = fluid_acoustic_time_step.exec();
                 fluid_pressure_relaxation.exec(acoustic_dt);
@@ -293,7 +293,7 @@ int main(int ac, char* av[])
                 relaxation_time += acoustic_dt;
                 integration_time += acoustic_dt;
                 GlobalStaticVariables::physical_time_ += acoustic_dt;
-            }
+            //}
 
             interval_computing_fluid_pressure_relaxation += TickCount::now() - time_instance;
 
