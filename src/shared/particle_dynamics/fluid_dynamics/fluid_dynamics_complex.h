@@ -139,40 +139,6 @@ class BaseViscousAccelerationWithWall : public InteractionWithWall<ViscousAccele
 using ViscousAccelerationWithWall = BaseViscousAccelerationWithWall<ViscousAccelerationInner>;
 
 /**
- * @class VorticityWithWall
- * @brief compute vorticity in the fluid field.
- */
-template <class VorticityInnerType>
-class BaseVorticityWithWall : public InteractionWithWall<VorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseVorticityWithWall(Args &&...args)
-        : InteractionWithWall<VorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseVorticityWithWall() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-using VorticityWithWall = BaseVorticityWithWall<VorticityInner>;
-
-/**
- * @class AngleVorticityWithWall
- * @brief compute vorticity in the fluid field.
- */
-template <class AngleVorticityInnerType>
-class BaseAngleVorticityWithWall : public InteractionWithWall<AngleVorticityInnerType>
-{
-public:
-    template <typename... Args>
-    BaseAngleVorticityWithWall(Args &&...args)
-        : InteractionWithWall<AngleVorticityInnerType>(std::forward<Args>(args)...) {};
-    virtual ~BaseAngleVorticityWithWall() {};
-
-    inline void interaction(size_t index_i, Real dt = 0.0);
-};
-using AngleVorticityWithWall = BaseAngleVorticityWithWall<AngleVorticityInner>;
-
-/**
  * @class BaseIntegration1stHalfWithWall
  * @brief  template class pressure relaxation scheme together with wall boundary
  */
