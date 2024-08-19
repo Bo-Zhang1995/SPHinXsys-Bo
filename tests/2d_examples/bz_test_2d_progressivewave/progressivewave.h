@@ -12,7 +12,7 @@ using namespace SPH;
 //------------------------------------------------------------------------------
 // global parameters for the case
 //------------------------------------------------------------------------------
-Real total_physical_time = 50.0;
+Real total_physical_time = 100.0;
 
 Real DL = 60; // tank length
 Real DL_FLAT = 50; // flat tank length
@@ -190,7 +190,7 @@ public:
     WaveMaking(BodyPartByParticle& body_part)
         : solid_dynamics::BaseMotionConstraint<BodyPartByParticle>(body_part),
         model_scale_(1.0), gravity_(gravity_g), water_depth_(Water_H), wave_height_(0.08),
-        wave_period_(1.407)
+        wave_period_(0.98)
     {
         computeWaveStrokeAndFrequency();
     }
@@ -208,11 +208,11 @@ Real h = 1.3 * particle_spacing_ref;
 MultiPolygon createWaveProbeShape(size_t index)
 {
     std::vector<Vecd> pnts;
-    pnts.push_back(Vecd(0.15 * index - h, 0.0));
-    pnts.push_back(Vecd(0.15 * index - h, 1.5));
-    pnts.push_back(Vecd(0.15 * index + h, 1.5));
-    pnts.push_back(Vecd(0.15 * index + h, 0.0));
-    pnts.push_back(Vecd(0.15 * index - h, 0.0));
+    pnts.push_back(Vecd(0.1 * index - h, 0.0));
+    pnts.push_back(Vecd(0.1 * index - h, 1.5));
+    pnts.push_back(Vecd(0.1 * index + h, 1.5));
+    pnts.push_back(Vecd(0.1 * index + h, 0.0));
+    pnts.push_back(Vecd(0.1 * index - h, 0.0));
     
     MultiPolygon multi_polygon;
     multi_polygon.addAPolygon(pnts, ShapeBooleanOps::add);

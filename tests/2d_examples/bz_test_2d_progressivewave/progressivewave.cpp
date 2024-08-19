@@ -67,14 +67,14 @@ int main(int ac, char *av[])
     
     /** WaveProbes. */
     std::vector<BodyRegionByCell> wave_probe_buffer_no;
-    for (size_t i = 0; i < 280; ++i)
+    for (size_t i = 0; i < 500; ++i)
     {
         std::string name = "WaveProbe_" + std::to_string(i);
         wave_probe_buffer_no.emplace_back(water_block, makeShared<MultiPolygonShape>(createWaveProbeShape(i), name));
     }
 
     std::vector<ReducedQuantityRecording<UpperFrontInAxisDirection<BodyPartByCell>>> wave_probe;
-    for (size_t i = 0; i < 280; ++i)
+    for (size_t i = 0; i < 500; ++i)
     {
         wave_probe.emplace_back(io_environment, wave_probe_buffer_no[i], "FreeSurfaceHeight");
     }
@@ -139,7 +139,7 @@ int main(int ac, char *av[])
             wall_boundary.updateCellLinkedList();
             water_block_complex.updateConfiguration();
 
-            if (GlobalStaticVariables::physical_time_ >= 35)
+            if (GlobalStaticVariables::physical_time_ >= 60)
             {
                 for (auto& wave_probe_index : wave_probe)
                 {
