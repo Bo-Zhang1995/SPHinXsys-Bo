@@ -1,5 +1,4 @@
 #include "level_set.h"
-
 #include "base_body.h"
 #include "base_kernel.h"
 #include "base_particle_dynamics.h"

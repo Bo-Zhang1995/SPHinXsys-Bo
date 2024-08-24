@@ -223,14 +223,13 @@ RelaxationStepInnerImplicit(BaseInnerRelation& inner_relation, bool level_set_co
 template <class RelaxationType>
 void RelaxationStepInnerImplicit<RelaxationType>::exec(Real dt)
 {
-    time_step_size_ =  SMIN(20 * sqrt(get_time_step_.exec()), 1.0);
+    time_step_size_ =  10 * sqrt(get_time_step_.exec());
     relaxation_evolution_inner_.exec(time_step_size_);
     /* For implicit scheme, the B relaxation should keep the same configuration
        calculation for both B calculating and updating positions. */
     surface_bounding_.exec(); //no surface_bounding for implicit scheme.
     real_body_->updateCellLinkedList(); 
-    inner_relation_.updateConfiguration();
-   
+    inner_relation_.updateConfiguration(); 
 }
 //=================================================================================================//
 template <class RelaxationType>
@@ -364,7 +363,7 @@ RelaxationStepComplexImplicit(ComplexRelation& complex_relation, bool level_set_
 template <class RelaxationType>
 void RelaxationStepComplexImplicit<RelaxationType>::exec(Real dt)
 {
-    time_step_size_ = SMIN(20 * sqrt(get_time_step_.exec()), 1.0);
+    time_step_size_ = 10 * sqrt(get_time_step_.exec());
     relaxation_evolution_complex_.exec(time_step_size_);
     real_body_->updateCellLinkedList();
     complex_relation_.updateConfiguration();

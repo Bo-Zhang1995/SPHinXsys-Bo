@@ -73,7 +73,7 @@ void ICEIntegration1stHalfWithWall<ICEIntegration1stHalfType>::interaction(size_
     ICEIntegration1stHalfType::interaction(index_i, dt);
 
     FluidState state_i(this->rho_[index_i], this->vel_[index_i], this->p_[index_i]);
-    const Vecd& distance_from_wall = this->distance_from_wall_[index_i];
+
     Vecd momentum_change_rate = Vecd::Zero();
     for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
     {
@@ -84,14 +84,10 @@ void ICEIntegration1stHalfWithWall<ICEIntegration1stHalfType>::interaction(size_
         for (size_t n = 0; n != wall_neighborhood.current_size_; ++n)
         {
             size_t index_j = wall_neighborhood.j_[n];
-            Real r_ij = wall_neighborhood.r_ij_[n];
-            Vecd e_ij = wall_neighborhood.e_ij_[n];
+            Vecd &e_ij = wall_neighborhood.e_ij_[n];
             Real dW_ijV_j = wall_neighborhood.dW_ijV_j_[n];
 
             Vecd vel_in_wall = 2.0 * vel_ave_k[index_j] - this->vel_[index_i];
-            //Vecd distance_diff = distance_from_wall - r_ij * e_ij;
-            //Real factor = -distance_from_wall.dot(distance_diff) / distance_from_wall.squaredNorm();
-            //Vecd vel_in_wall = vel_ave_k[index_j] - factor * (this->vel_[index_i] - vel_ave_k[index_j]);
             Real p_in_wall = this->p_[index_i];
             Real rho_in_wall = this->rho_[index_i];
             FluidState state_j(rho_in_wall, vel_in_wall, p_in_wall);
@@ -166,12 +162,12 @@ void ICEIntegration2ndHalf<RiemannSolverType>::interaction(size_t index_i, Real 
         else if (s_l > 0)
         {
             density_change_rate -= 2 * flux_l.dot(e_ij) * dW_ijV_j;
-            //std::cout << "The left state is located." << std::endl;
+            std::cout << "The left state is located." << std::endl;
         }
         else if (s_r < 0)
         {
             density_change_rate -= 2 * flux_r.dot(e_ij) * dW_ijV_j;
-            //std::cout << "The right state is located." << std::endl;
+            std::cout << "The right state is located." << std::endl;
         }
     }
     drho_dt_[index_i] = density_change_rate;
@@ -190,7 +186,6 @@ void ICEIntegration2ndHalfWithWall<ICEIntegration2ndHalfType>::interaction(size_
     ICEIntegration2ndHalfType::interaction(index_i, dt);
 
     FluidState state_i(this->rho_[index_i], this->vel_[index_i], this->p_[index_i]);
-    const Vecd& distance_from_wall = this->distance_from_wall_[index_i];
     Real density_change_rate = 0.0;
     for (size_t k = 0; k < FluidWallData::contact_configuration_.size(); ++k)
     {
@@ -205,9 +200,6 @@ void ICEIntegration2ndHalfWithWall<ICEIntegration2ndHalfType>::interaction(size_
             Real dW_ijV_j = wall_neighborhood.dW_ijV_j_[n];
 
             Vecd vel_in_wall = 2.0 * vel_ave_k[index_j] - this->vel_[index_i];
-            //Vecd distance_diff = distance_from_wall - wall_neighborhood.r_ij_[n] * e_ij;
-            //Real factor = -distance_from_wall.dot(distance_diff) / distance_from_wall.squaredNorm();
-            //Vecd vel_in_wall = vel_ave_k[index_j] - factor * (this->vel_[index_i] - vel_ave_k[index_j]);
             Real p_in_wall = state_i.p_;
             Real rho_in_wall = state_i.rho_;
             FluidState state_j(rho_in_wall, vel_in_wall, p_in_wall);
@@ -232,18 +224,10 @@ void ICEIntegration2ndHalfWithWall<ICEIntegration2ndHalfType>::interaction(size_
             else if (s_l > 0)
             {
                 density_change_rate -= 2 * flux_l.dot(e_ij) * dW_ijV_j;
-               /* std::cout << "The left state is located." << std::endl;
-                std::cout << "distance" << distance_from_wall << std::endl;
-                std::cout << "factor" << factor << std::endl;
-                std::cout << "vi " << this->vel_[index_i] << std::endl;
-                std::cout << "vwall" << vel_ave_k[index_j] << std::endl;
-                std::cout <<"corrected velocity" <<  vel_in_wall << std::endl;
-                std::cout <<"old velocity" <<  2.0 * vel_ave_k[index_j] - this->vel_[index_i] << std::endl;*/
             }
             else if (s_r < 0)
             {
                 density_change_rate -= 2 * flux_r.dot(e_ij) * dW_ijV_j;
-                //std::cout << "The right state is located." << std::endl;
             }
         }
     }
