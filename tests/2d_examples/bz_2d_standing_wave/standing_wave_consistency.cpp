@@ -191,8 +191,6 @@ int main(int ac, char* av[])
     //	Note that there may be data dependence on the sequence of constructions.
     //----------------------------------------------------------------------
     /** time-space method to detect surface particles. */
-    //Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannWithWall> fluid_pressure_relaxation(water_block_complex);
-    //Dynamics1Level<fluid_dynamics::Integration1stHalfCorrectWithWall> fluid_pressure_relaxation(water_block_complex);
     Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannConsistencyWithWall> fluid_pressure_relaxation(water_block_complex);
     Dynamics1Level<fluid_dynamics::Integration2ndHalfRiemannWithWall> fluid_density_relaxation(water_block_complex);
     InteractionWithUpdate<KernelCorrectionMatrixComplex> corrected_configuration_fluid(water_block_complex, 0.5);
@@ -204,11 +202,12 @@ int main(int ac, char* av[])
     ReduceDynamics<fluid_dynamics::AdvectionTimeStepSize> fluid_advection_time_step(water_block, U_ref);
     ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> fluid_acoustic_time_step(water_block);
     water_block.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
+    water_block.addBodyStateForRecording<Real>("DensityChangeRate");
     //----------------------------------------------------------------------
     //	Define the methods for I/O operations, observations
     //	and regression tests of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp body_states_recording(io_environment, sph_system.real_bodies_);
+    BodyStatesRecordingToPlt body_states_recording(io_environment, sph_system.real_bodies_);
     RestartIO restart_io(io_environment, sph_system.real_bodies_);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<TotalMechanicalEnergy>>>
         write_water_mechanical_energy(io_environment, water_block, gravity_ptr);
