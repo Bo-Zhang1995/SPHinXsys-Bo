@@ -87,16 +87,16 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     using MainExecutionPolicy = execution::ParallelDevicePolicy; // define execution policy for this case
 
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> soil_cell_linked_list(soil_block);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> wall_cell_linked_list(wall_boundary);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> soil_cell_linked_list(soil_block);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> wall_cell_linked_list(wall_boundary);
 
     //----------------------------------------------------------------------
     // Combined relations built from basic relations
     // which is only used for update configuration.
     //----------------------------------------------------------------------
 
-    Relation<Inner<>> soil_block_inner(soil_block);
-    Relation<Contact<>> soil_block_contact(soil_block, {&wall_boundary});
+    Inner<> soil_block_inner(soil_block);
+    Contact<> soil_block_contact(soil_block, {&wall_boundary});
 
     UpdateRelation<MainExecutionPolicy, Inner<>, Contact<>> soil_block_update_complex_relation(soil_block_inner, soil_block_contact);
     ParticleSortCK<MainExecutionPolicy> particle_sort(soil_block);
@@ -108,7 +108,7 @@ int main(int ac, char *av[])
     StateDynamics<MainExecutionPolicy, GravityForceCK<Gravity>> constant_gravity(soil_block, gravity);
     StateDynamics<execution::ParallelPolicy, NormalFromBodyShapeCK> wall_boundary_normal_direction(wall_boundary);
     StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepSetup> soil_advection_step_setup(soil_block);
-    StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepClose> soil_advection_step_close(soil_block);
+    StateDynamics<MainExecutionPolicy, fluid_dynamics::UpdateParticlePosition> soil_update_particle_position(soil_block);
 
     InteractionDynamicsCK<MainExecutionPolicy, continuum_dynamics::PlasticAcousticStep1stHalfWithWallRiemannCK>
         soil_acoustic_step_1st_half(soil_block_inner, soil_block_contact);
@@ -122,14 +122,14 @@ int main(int ac, char *av[])
     //	Define the methods for I/O operations, observations
     //	and regression tests of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp body_states_recording(sph_system);
+    BodyStatesRecordingToVtpCK<MainExecutionPolicy> body_states_recording(sph_system);
     body_states_recording.addToWrite<Vecd>(wall_boundary, "NormalDirection");
     body_states_recording.addToWrite<Real>(soil_block, "Density");
     StateDynamics<MainExecutionPolicy, continuum_dynamics::VerticalStressCK> vertical_stress(soil_block);
     body_states_recording.addToWrite<Real>(soil_block, "VerticalStress");
     StateDynamics<MainExecutionPolicy, continuum_dynamics::AccDeviatoricPlasticStrainCK> accumulated_deviatoric_plastic_strain(soil_block);
     body_states_recording.addToWrite<Real>(soil_block, "AccDeviatoricPlasticStrain");
-    RestartIO restart_io(sph_system);
+    RestartIOCK<MainExecutionPolicy> restart_io(sph_system);
 
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<MainExecutionPolicy, TotalMechanicalEnergyCK>>
         write_mechanical_energy(soil_block, gravity);
@@ -166,7 +166,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    body_states_recording.writeToFile(MainExecutionPolicy{});
+    body_states_recording.writeToFile();
     write_mechanical_energy.writeToFile(number_of_iterations);
     //----------------------------------------------------------------------
     //	Main loop starts here.
@@ -210,7 +210,7 @@ int main(int ac, char *av[])
                     if (number_of_iterations % restart_output_interval == 0)
                         restart_io.writeToFile(number_of_iterations);
                 }
-                soil_advection_step_close.exec();
+                soil_update_particle_position.exec();
                 number_of_iterations++;
                 /** Update cell linked list and configuration. */
                 time_instance = TickCount::now();
@@ -221,7 +221,7 @@ int main(int ac, char *av[])
         }
         vertical_stress.exec();
         accumulated_deviatoric_plastic_strain.exec();
-        body_states_recording.writeToFile(MainExecutionPolicy{});
+        body_states_recording.writeToFile();
         TickCount t2 = TickCount::now();
         TickCount t3 = TickCount::now();
         interval += t3 - t2;

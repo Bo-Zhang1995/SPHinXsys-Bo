@@ -141,10 +141,10 @@ int main(int ac, char *av[])
     //	Basically the the range of bodies to build neighbor particle lists.
     //  Generally, we first define all the inner relations, then the contact relations.
     //----------------------------------------------------------------------
-    Relation<Inner<>> water_block_inner(water_block);
-    Relation<Contact<>> water_block_contact(water_block, {&wall_boundary, &structure});
-    Relation<Contact<>> structure_contact(structure, {&water_block});
-    Relation<Contact<>> observer_contact(observer, {&structure});
+    Inner<> water_block_inner(water_block);
+    Contact<> water_block_contact(water_block, {&wall_boundary, &structure});
+    Contact<> structure_contact(structure, {&water_block});
+    Contact<> observer_contact(observer, {&structure});
     //----------------------------------------------------------------------
     // Define the main execution policy for this case.
     //----------------------------------------------------------------------
@@ -160,9 +160,9 @@ int main(int ac, char *av[])
     // Finally, the auxiliary models such as time step estimator, initial condition,
     // boundary condition and other constraints should be defined.
     //----------------------------------------------------------------------
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> water_cell_linked_list(water_block);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> wall_cell_linked_list(wall_boundary);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> structure_cell_linked_list(structure);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> water_cell_linked_list(water_block);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> wall_cell_linked_list(wall_boundary);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> structure_cell_linked_list(structure);
 
     UpdateRelation<MainExecutionPolicy, Inner<>, Contact<>>
         water_block_update_complex_relation(water_block_inner, water_block_contact);
@@ -177,7 +177,7 @@ int main(int ac, char *av[])
     StateDynamics<execution::ParallelPolicy, NormalFromBodyShapeCK> wall_boundary_normal_direction(wall_boundary);
     StateDynamics<execution::ParallelPolicy, NormalFromBodyShapeCK> structure_boundary_normal_direction(structure);
     StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepSetup> water_advection_step_setup(water_block);
-    StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepClose> water_advection_step_close(water_block);
+    StateDynamics<MainExecutionPolicy, fluid_dynamics::UpdateParticlePosition> water_update_particle_position(water_block);
 
     InteractionDynamicsCK<MainExecutionPolicy, fluid_dynamics::AcousticStep1stHalfWithWallRiemannCK>
         fluid_acoustic_step_1st_half(water_block_inner, water_block_contact);
@@ -264,7 +264,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	Define the methods for I/O operations and observations of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp write_real_body_states(sph_system);
+    BodyStatesRecordingToVtpCK<MainExecutionPolicy> write_real_body_states(sph_system);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<
         MainExecutionPolicy, UpperFrontInAxisDirectionCK<BodyRegionByCell>>>
         wave_gauge(wave_probe_buffer, "FreeSurfaceHeight");
@@ -303,7 +303,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    write_real_body_states.writeToFile(MainExecutionPolicy{});
+    write_real_body_states.writeToFile();
     write_structure_position.writeToFile(0);
     wave_gauge.writeToFile(0);
     //----------------------------------------------------------------------
@@ -345,7 +345,7 @@ int main(int ac, char *av[])
                 if (total_time >= relax_time)
                     sv_physical_time->incrementValue(acoustic_dt);
             }
-            water_advection_step_close.exec();
+            water_update_particle_position.exec();
 
             if (number_of_iterations % screen_output_interval == 0)
             {
@@ -377,7 +377,7 @@ int main(int ac, char *av[])
 
         TickCount t2 = TickCount::now();
         if (total_time >= relax_time)
-            write_real_body_states.writeToFile(MainExecutionPolicy{});
+            write_real_body_states.writeToFile();
         TickCount t3 = TickCount::now();
         interval += t3 - t2;
     }

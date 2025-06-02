@@ -155,10 +155,10 @@ int main(int ac, char *av[])
     //	The contact map gives the topological connections between the bodies.
     //	Basically the the range of bodies to build neighbor particle lists.
     //----------------------------------------------------------------------
-    Relation<Inner<>> water_block_inner(water_body);
-    Relation<Contact<>> water_wall_contact(water_body, {&wall_boundary});
-    Relation<Contact<>> horizontal_observer_contact(horizontal_observer, {&water_body});
-    Relation<Contact<>> vertical_observer_contact(vertical_observer, {&water_body});
+    Inner<> water_block_inner(water_body);
+    Contact<> water_wall_contact(water_body, {&wall_boundary});
+    Contact<> horizontal_observer_contact(horizontal_observer, {&water_body});
+    Contact<> vertical_observer_contact(vertical_observer, {&water_body});
     //----------------------------------------------------------------------
     // Define the main execution policy for this case.
     //----------------------------------------------------------------------
@@ -176,8 +176,8 @@ int main(int ac, char *av[])
     // Finally, the auxiliary models such as time step estimator, initial condition,
     // boundary condition and other constraints should be defined.
     //----------------------------------------------------------------------
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> water_cell_linked_list(water_body);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> wall_cell_linked_list(wall_boundary);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> water_cell_linked_list(water_body);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> wall_cell_linked_list(wall_boundary);
     UpdateRelation<MainExecutionPolicy, Inner<>, Contact<>> water_block_update_complex_relation(water_block_inner, water_wall_contact);
     UpdateRelation<MainExecutionPolicy, Contact<>> horizontal_observer_contact_relation(horizontal_observer_contact);
     UpdateRelation<MainExecutionPolicy, Contact<>> vertical_observer_contact_relation(vertical_observer_contact);
@@ -187,7 +187,7 @@ int main(int ac, char *av[])
     StateDynamics<MainExecutionPolicy, NormalFromBodyShapeCK> wall_boundary_normal_direction(wall_boundary); // run on CPU
     /** Time step size with considering sound wave speed. */
     StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepSetup> water_advection_step_setup(water_body);
-    StateDynamics<MainExecutionPolicy, fluid_dynamics::AdvectionStepClose> water_advection_step_close(water_body);
+    StateDynamics<MainExecutionPolicy, fluid_dynamics::UpdateParticlePosition> water_update_particle_position(water_body);
 
     /** Initial condition with momentum field */
     SimpleDynamics<BoundaryVelocity> solid_initial_condition(wall_boundary);
@@ -220,13 +220,13 @@ int main(int ac, char *av[])
     //	Define the methods for I/O operations and observations of the simulation.
     //----------------------------------------------------------------------
     /** Output the body states. */
-    BodyStatesRecordingToVtp body_states_recording(sph_system);
+    BodyStatesRecordingToVtpCK<MainExecutionPolicy> body_states_recording(sph_system);
     body_states_recording.addToWrite<Vecd>(water_body, "Velocity");
     body_states_recording.addToWrite<Real>(water_body, "Density");
     body_states_recording.addToWrite<int>(water_body, "Indicator");
     body_states_recording.addToWrite<Vecd>(wall_boundary, "Velocity");
 
-    RestartIO restart_io(sph_system);
+    RestartIOCK<MainExecutionPolicy> restart_io(sph_system);
 
     RegressionTestDynamicTimeWarping<ObservedQuantityRecording<MainExecutionPolicy, Vecd>> write_horizontal_velocity("Velocity", horizontal_observer_contact);
     RegressionTestDynamicTimeWarping<ObservedQuantityRecording<MainExecutionPolicy, Vecd>> write_vertical_velocity("Velocity", vertical_observer_contact);
@@ -270,7 +270,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    body_states_recording.writeToFile(MainExecutionPolicy{});
+    body_states_recording.writeToFile();
     write_horizontal_velocity.writeToFile(number_of_iterations);
     write_vertical_velocity.writeToFile(number_of_iterations);
     //----------------------------------------------------------------------
@@ -308,7 +308,7 @@ int main(int ac, char *av[])
                 integration_time += acoustic_dt;
                 sv_physical_time->incrementValue(acoustic_dt);
             }
-            water_advection_step_close.exec();
+            water_update_particle_position.exec();
             interval_acoustic_steps += TickCount::now() - time_instance;
 
             /** screen output, write body observables and restart files  */
@@ -319,7 +319,7 @@ int main(int ac, char *av[])
                           << "	advection_dt = " << advection_dt << "	acoustic_dt = " << acoustic_dt << "\n";
 
                 if (number_of_iterations % restart_output_interval == 0)
-                    restart_io.writeToFile(MainExecutionPolicy{}, number_of_iterations);
+                    restart_io.writeToFile( number_of_iterations);
             }
             number_of_iterations++;
 
@@ -340,7 +340,7 @@ int main(int ac, char *av[])
         vertical_observer_contact_relation.exec();
         write_horizontal_velocity.writeToFile(number_of_iterations);
         write_vertical_velocity.writeToFile(number_of_iterations);
-        body_states_recording.writeToFile(MainExecutionPolicy{});
+        body_states_recording.writeToFile();
         TickCount t3 = TickCount::now();
         interval_writing_body_state += t3 - t2;
     }

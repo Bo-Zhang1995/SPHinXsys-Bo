@@ -139,8 +139,8 @@ int main(int ac, char *av[])
     //	Basically the the range of bodies to build neighbor particle lists.
     //  Generally, we first define all the inner relations, then the contact relations.
     //----------------------------------------------------------------------
-    Relation<Inner<>> diffusion_body_inner(diffusion_body);
-    Relation<Contact<>> observer_contact(temperature_observer, {&diffusion_body});
+    Inner<> diffusion_body_inner(diffusion_body);
+    Contact<> observer_contact(temperature_observer, {&diffusion_body});
     //----------------------------------------------------------------------
     // Define the main execution policy for this case.
     //----------------------------------------------------------------------
@@ -156,7 +156,7 @@ int main(int ac, char *av[])
     // Finally, the auxiliary models such as time step estimator, initial condition,
     // boundary condition and other constraints should be defined.
     //----------------------------------------------------------------------
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> diffusion_body_cell_linked_list(diffusion_body);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> diffusion_body_cell_linked_list(diffusion_body);
     UpdateRelation<MainExecutionPolicy, Inner<>> water_block_update_complex_relation(diffusion_body_inner);
     UpdateRelation<MainExecutionPolicy, Contact<>> observer_update_contact_relation(observer_contact);
 
@@ -181,7 +181,7 @@ int main(int ac, char *av[])
     //	Define the methods for I/O operations, observations of the simulation.
     //	Regression tests are also defined here.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp write_states(sph_system);
+    BodyStatesRecordingToVtpCK<MainExecutionPolicy> write_states(sph_system);
     RegressionTestEnsembleAverage<ObservedQuantityRecording<MainExecutionPolicy, Real>>
         write_solid_temperature(diffusion_species_name, observer_contact);
     BodyRegionByParticle inner_domain(diffusion_body, makeShared<MultiPolygonShape>(createInnerDomain(), "InnerDomain"));
@@ -217,7 +217,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    write_states.writeToFile(MainExecutionPolicy{});
+    write_states.writeToFile();
     write_solid_temperature.writeToFile(ite);
     //----------------------------------------------------------------------
     //	Main loop starts here.
@@ -248,7 +248,7 @@ int main(int ac, char *av[])
                 {
                     write_solid_temperature.writeToFile(ite);
                     write_solid_average_temperature_part.writeToFile(ite);
-                    write_states.writeToFile(MainExecutionPolicy{});
+                    write_states.writeToFile();
                 }
             }
         }

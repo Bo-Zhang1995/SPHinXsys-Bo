@@ -134,10 +134,10 @@ int main(int ac, char *av[])
     //	Basically the the range of bodies to build neighbor particle lists.
     //  Generally, we first define all the inner relations, then the contact relations.
     //----------------------------------------------------------------------
-    Relation<Inner<>> diffusion_body_inner(diffusion_body);
-    Relation<Contact<>> diffusion_body_contact_Dirichlet(diffusion_body, {&wall_Dirichlet});
-    Relation<Contact<>> diffusion_body_contact_Neumann(diffusion_body, {&wall_Neumann});
-    Relation<Contact<>> temperature_observer_contact(temperature_observer, {&diffusion_body});
+    Inner<> diffusion_body_inner(diffusion_body);
+    Contact<> diffusion_body_contact_Dirichlet(diffusion_body, {&wall_Dirichlet});
+    Contact<> diffusion_body_contact_Neumann(diffusion_body, {&wall_Neumann});
+    Contact<> temperature_observer_contact(temperature_observer, {&diffusion_body});
     //----------------------------------------------------------------------
     // Define the main execution policy for this case.
     //----------------------------------------------------------------------
@@ -153,9 +153,9 @@ int main(int ac, char *av[])
     // Finally, the auxiliary models such as time step estimator, initial condition,
     // boundary condition and other constraints should be defined.
     //----------------------------------------------------------------------
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> diffusion_body_cell_linked_list(diffusion_body);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> wall_Dirichlet_cell_linked_list(wall_Dirichlet);
-    UpdateCellLinkedList<MainExecutionPolicy, CellLinkedList> wall_Neumann_cell_linked_list(wall_Neumann);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> diffusion_body_cell_linked_list(diffusion_body);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> wall_Dirichlet_cell_linked_list(wall_Dirichlet);
+    UpdateCellLinkedList<MainExecutionPolicy, RealBody> wall_Neumann_cell_linked_list(wall_Neumann);
 
     UpdateRelation<MainExecutionPolicy, Inner<>, Contact<>, Contact<>>
         water_block_update_complex_relation(
@@ -190,7 +190,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	Define the methods for I/O operations and observations of the simulation.
     //----------------------------------------------------------------------
-    BodyStatesRecordingToVtp write_states(sph_system);
+    BodyStatesRecordingToVtpCK<MainExecutionPolicy> write_states(sph_system);
     RegressionTestEnsembleAverage<ObservedQuantityRecording<MainExecutionPolicy, Real, RestoringCorrection>>
         write_solid_temperature(diffusion_species_name, temperature_observer_contact);
     //----------------------------------------------------------------------
@@ -228,7 +228,7 @@ int main(int ac, char *av[])
     //----------------------------------------------------------------------
     //	First output before the main loop.
     //----------------------------------------------------------------------
-    write_states.writeToFile(MainExecutionPolicy{});
+    write_states.writeToFile();
     write_solid_temperature.writeToFile(ite);
     //----------------------------------------------------------------------
     //	Main loop starts here.
@@ -259,7 +259,7 @@ int main(int ac, char *av[])
         }
 
         TickCount t2 = TickCount::now();
-        write_states.writeToFile(MainExecutionPolicy{});
+        write_states.writeToFile();
         write_solid_temperature.writeToFile(ite);
         TickCount t3 = TickCount::now();
         interval += t3 - t2;
