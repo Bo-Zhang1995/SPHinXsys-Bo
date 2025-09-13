@@ -102,8 +102,12 @@ int main(int ac, char *av[])
     /** Here, we do not use Riemann solver for pressure as the flow is viscous.
      * The other reason is that we are using transport velocity formulation,
      * which will also introduce numerical dissipation slightly. */
+
+    /** Kernel correction matrix and transport velocity formulation. */
+    InteractionWithUpdate<LinearGradientCorrectionMatrixInner> kernel_correction_inner(water_block_inner);
     Dynamics1Level<fluid_dynamics::Integration1stHalfInnerRiemann> pressure_relaxation(water_block_inner);
-    Dynamics1Level<fluid_dynamics::Integration2ndHalfInnerNoRiemann> density_relaxation(water_block_inner);
+    Dynamics1Level<fluid_dynamics::Integration2ndHalfCorrectionInnerNoRiemann> density_relaxation(water_block_inner);
+    SimpleDynamics<fluid_dynamics::ContinuumVolumeUpdate> update_volume(water_block);
     InteractionWithUpdate<fluid_dynamics::DensitySummationInner> update_density_by_summation(water_block_inner);
     InteractionWithUpdate<fluid_dynamics::ViscousForceInner> viscous_force(water_block_inner);
     InteractionWithUpdate<fluid_dynamics::TransportVelocityCorrectionInner<TruncatedLinear, AllParticles>> transport_velocity_correction(water_block_inner);
@@ -118,11 +122,24 @@ int main(int ac, char *av[])
     //	and regression tests of the simulation.
     //----------------------------------------------------------------------
     BodyStatesRecordingToVtp body_states_recording(sph_system);
+    body_states_recording.addToWrite<Real>(water_block, "VolumetricMeasure");
+    body_states_recording.addToWrite<Matd>(water_block, "LinearGradientCorrectionMatrix");
+
+    /*recording parameters*/
+    body_states_recording.addToWrite<Real>(water_block, "DensitySummation");
+    body_states_recording.addToWrite<Real>(water_block, "DensityEvolved");
+    body_states_recording.addToWrite<Real>(water_block, "DensityChangeRate");
+    body_states_recording.addToWrite<Real>(water_block, "VelocityDivergence");
+
     ReloadParticleIO write_particle_reload_files(water_block);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<TotalKineticEnergy>>
         write_total_kinetic_energy(water_block);
     RegressionTestDynamicTimeWarping<ReducedQuantityRecording<MaximumSpeed>>
         write_maximum_speed(water_block);
+    ReducedQuantityRecording<Average<QuantityAbsoluteSummation<Real, SPHBody>>>
+        write_averaged_velocity_divergence(water_block, "VelocityDivergence");
+    ReducedQuantityRecording<Average<QuantityAbsoluteSummation<Real, SPHBody>>>
+        write_averaged_density_error(water_block, "DensityError");
     //----------------------------------------------------------------------
     //	Prepare the simulation with cell linked list, configuration
     //	and case specified initial condition if necessary.
@@ -158,8 +175,10 @@ int main(int ac, char *av[])
         {
             Real Dt = get_fluid_advection_time_step_size.exec();
             update_density_by_summation.exec();
+            // update_volume.exec();
             viscous_force.exec();
             transport_velocity_correction.exec();
+            //kernel_correction_inner.exec();
 
             Real relaxation_time = 0.0;
             while (relaxation_time < Dt)
@@ -168,8 +187,8 @@ int main(int ac, char *av[])
                 dt = SMIN(get_fluid_time_step_size.exec(), Dt);
                 relaxation_time += dt;
                 integration_time += dt;
-                pressure_relaxation.exec(dt);
-                density_relaxation.exec(dt);
+                pressure_relaxation.exec(dt); //RKGC imposed or not
+                density_relaxation.exec(dt);  //KGC imposed or not
                 physical_time += dt;
             }
 
@@ -193,6 +212,8 @@ int main(int ac, char *av[])
         TickCount t2 = TickCount::now();
         write_total_kinetic_energy.writeToFile(number_of_iterations);
         write_maximum_speed.writeToFile(number_of_iterations);
+        write_averaged_velocity_divergence.writeToFile(number_of_iterations);
+        write_averaged_density_error.writeToFile(number_of_iterations);
         body_states_recording.writeToFile();
         TickCount t3 = TickCount::now();
         interval += t3 - t2;

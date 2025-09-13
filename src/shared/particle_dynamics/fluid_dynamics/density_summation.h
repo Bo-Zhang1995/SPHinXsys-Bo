@@ -51,7 +51,7 @@ class DensitySummation<Base, DataDelegationType>
     virtual ~DensitySummation(){};
 
   protected:
-    Real *rho_, *mass_, *rho_sum_, *Vol_;
+    Real *rho_, *mass_, *rho_sum_, *Vol_, *rho_evo_, *rho_dif_;
     Real rho0_, inv_sigma0_, W0_;
 };
 

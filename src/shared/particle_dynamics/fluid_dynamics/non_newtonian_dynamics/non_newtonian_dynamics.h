@@ -86,7 +86,7 @@ class Oldroyd_BIntegration2ndHalf<Inner<>> : public Integration2ndHalfInnerRiema
 };
 
 using Integration2ndHalfContactWallRiemann =
-    Integration2ndHalf<Contact<Wall>, AcousticRiemannSolver>;
+    Integration2ndHalf<Contact<Wall>, AcousticRiemannSolver, NoKernelCorrection>;
 
 template <>
 class Oldroyd_BIntegration2ndHalf<Contact<Wall>> : public Integration2ndHalfContactWallRiemann

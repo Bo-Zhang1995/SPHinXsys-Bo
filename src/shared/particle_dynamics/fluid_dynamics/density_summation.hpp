@@ -15,6 +15,8 @@ DensitySummation<Base, DataDelegationType>::DensitySummation(BaseRelationType &b
       mass_(this->particles_->template getVariableDataByName<Real>("Mass")),
       rho_sum_(this->particles_->template registerStateVariable<Real>("DensitySummation")),
       Vol_(this->particles_->template getVariableDataByName<Real>("VolumetricMeasure")),
+      rho_evo_(this->particles_->template registerStateVariable<Real>("DensityEvolved")),
+      rho_dif_(this->particles_->template registerStateVariable<Real>("DensityError")),
       rho0_(this->sph_body_.getBaseMaterial().ReferenceDensity()),
       inv_sigma0_(1.0 / this->sph_body_.getSPHAdaptation().LatticeNumberDensity()),
       W0_(this->sph_body_.getSPHAdaptation().getKernel()->W0(ZeroVecd)) {}
