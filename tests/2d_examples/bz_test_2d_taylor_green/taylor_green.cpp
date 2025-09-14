@@ -102,7 +102,6 @@ int main(int ac, char *av[])
     /** Here, we do not use Riemann solver for pressure as the flow is viscous.
      * The other reason is that we are using transport velocity formulation,
      * which will also introduce numerical dissipation slightly. */
-
     /** Kernel correction matrix and transport velocity formulation. */
     InteractionWithUpdate<LinearGradientCorrectionMatrixInner> kernel_correction_inner(water_block_inner);
     Dynamics1Level<fluid_dynamics::Integration1stHalfInnerRiemann> pressure_relaxation(water_block_inner);

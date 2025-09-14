@@ -11,17 +11,15 @@ namespace SPH
   * @brief Compute the kinematic energy
   */
 	class KineticEnergy
-		: public LocalDynamicsReduce<Real, ReduceSum<Real>>,
-		public GeneralDataDelegateSimple
+		: public LocalDynamicsReduce<ReduceSum<Real>>
 	{
 	protected:
-		StdLargeVec<Real>& mass_;
-		StdLargeVec<Vecd>& vel_;
+		Real *mass_;
+		Vecd *vel_;
 
 	public:
-		KineticEnergy(SPHBody& sph_body);
+		explicit KineticEnergy(SPHBody& sph_body);
 		virtual ~KineticEnergy() {};
-
 		Real reduce(size_t index_i, Real dt = 0.0);
 	};
 
@@ -30,20 +28,18 @@ namespace SPH
 	* @brief Compute the Potential energy
 	*/
 	class PotentialEnergy
-		: public LocalDynamicsReduce<Real, ReduceSum<Real>>,
-		public GeneralDataDelegateSimple
+		: public LocalDynamicsReduce<ReduceSum<Real>>
 	{
 	private:
 		SharedPtrKeeper<Gravity> gravity_ptr_keeper_;
 
 	protected:
-		StdLargeVec<Real>& mass_;
-		StdLargeVec<Vecd>& pos_;
+		Real *mass_;
+		Vecd *pos_;
 
 	public:
-		PotentialEnergy(SPHBody& sph_body);
+		explicit PotentialEnergy(SPHBody& sph_body);
 		virtual ~PotentialEnergy() {};
-
 		Real reduce(size_t index_i, Real dt = 0.0);
 	};
 } // namespace SPH

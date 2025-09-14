@@ -21,7 +21,7 @@ Real DH = 1.5; // tank height
 
 Real Water_H = 1.0; // water height
 Real DL_extra = 1.0; // for wave maker
-Real particle_spacing_ref = Water_H / 128; // particle spacing
+Real particle_spacing_ref = Water_H / 64; // particle spacing
 Real BW = particle_spacing_ref * 4.0; //boundary width
 BoundingBox system_domain_bounds(Vec2d(-DL_extra - BW, -BW), Vec2d(DL + BW, DH + BW));
 Real gravity_g = 9.81; // gravity
@@ -121,7 +121,7 @@ public:
 //------------------------------------------------------------------------------
 // Body parts used in the case
 //------------------------------------------------------------------------------
-class WaveMaking : public solid_dynamics::BaseMotionConstraint<BodyPartByParticle>
+class WaveMaking : public BodyPartMotionConstraint
 {
     Real model_scale_;
     Real gravity_;
@@ -188,20 +188,26 @@ class WaveMaking : public solid_dynamics::BaseMotionConstraint<BodyPartByParticl
 
 public:
     WaveMaking(BodyPartByParticle& body_part)
-        : solid_dynamics::BaseMotionConstraint<BodyPartByParticle>(body_part),
+      : BodyPartMotionConstraint(body_part),
         model_scale_(1.0), gravity_(gravity_g), water_depth_(Water_H), wave_height_(0.08),
-        wave_period_(0.98)
+        wave_period_(0.98),
+        acc_(particles_->registerStateVariable<Vecd>("Acceleration")),
+        physical_time_(sph_system_.getSystemVariableDataByName<Real>("PhysicalTime"))
     {
         computeWaveStrokeAndFrequency();
     }
 
     void update(size_t index_i, Real dt = 0.0)
     {
-        Real time = GlobalStaticVariables::physical_time_;
+        Real time = *physical_time_;
         pos_[index_i] = pos0_[index_i] + getDisplacement(time);
         vel_[index_i] = getVelocity(time);
         acc_[index_i] = getAcceleration(time);
     };
+
+    protected:
+        Vecd *acc_;
+        Real *physical_time_;
 };
 
 Real h = 1.3 * particle_spacing_ref;

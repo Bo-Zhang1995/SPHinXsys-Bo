@@ -6,9 +6,9 @@ namespace SPH
 {
 	//=================================================================================================//
 	KineticEnergy::KineticEnergy(SPHBody& sph_body)
-		: LocalDynamicsReduce<Real, ReduceSum<Real>>(sph_body, Real(0)),
-		GeneralDataDelegateSimple(sph_body), mass_(particles_->mass_),
-		vel_(particles_->vel_)
+		: LocalDynamicsReduce<ReduceSum<Real>>(sph_body), 
+		mass_(particles_->getVariableDataByName<Real>("Mass")),
+        vel_(particles_->getVariableDataByName<Vecd>("Velocity"))
 	{
 		quantity_name_ = "KineticEnergy";
 	}
@@ -19,9 +19,9 @@ namespace SPH
 	}
 	//=================================================================================================//
 	PotentialEnergy::PotentialEnergy(SPHBody& sph_body)
-		: LocalDynamicsReduce<Real, ReduceSum<Real>>(sph_body, Real(0)),
-		GeneralDataDelegateSimple(sph_body), mass_(particles_->mass_),
-		pos_(particles_->pos_)
+		: LocalDynamicsReduce<ReduceSum<Real>>(sph_body),
+		mass_(particles_->getVariableDataByName<Real>("Mass")),
+        pos_(particles_->getVariableDataByName<Vecd>("Position"))
 	{
 		quantity_name_ = "PotentialEnergy";
 	}
