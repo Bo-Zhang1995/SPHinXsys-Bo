@@ -195,10 +195,11 @@ void Integration2ndHalf<Inner<>, RiemannSolverType, KernelCorrectionType>::inter
 
         density_change_rate += (vel_[index_i] - vel_[index_j]).dot(0.5 * (correction_(index_i) + correction_(index_j)) * e_ij) * dW_ijV_j;
         Real u_jump = (vel_[index_i] - vel_[index_j]).dot(e_ij);
+        //density_change_rate += u_jump * dW_ijV_j;
         p_dissipation += riemann_solver_.DissipativePJump(u_jump) * dW_ijV_j * e_ij;
     }
     drho_dt_[index_i] += density_change_rate * rho_[index_i];
-    vel_div_[index_i] += density_change_rate;
+    //vel_div_[index_i] += density_change_rate;
     force_[index_i] = p_dissipation * Vol_[index_i];
 };
 //=================================================================================================//

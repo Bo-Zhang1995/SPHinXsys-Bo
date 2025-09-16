@@ -17,8 +17,8 @@ void DensitySummation<Inner<>>::interaction(size_t index_i, Real dt)
 //=================================================================================================//
 void DensitySummation<Inner<>>::update(size_t index_i, Real dt)
 {
-    rho_dif_[index_i] = rho_[index_i] - rho0_;
-    rho_evo_[index_i] = rho_[index_i];
+    //rho_dif_[index_i] = rho_[index_i] - rho0_;
+    //rho_evo_[index_i] = rho_[index_i];
     rho_[index_i] = rho_sum_[index_i];
     Vol_[index_i] = mass_[index_i] / rho_[index_i];
 }

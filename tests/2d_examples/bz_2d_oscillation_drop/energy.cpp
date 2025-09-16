@@ -28,7 +28,7 @@ namespace SPH
 	//=================================================================================================//
 	Real PotentialEnergy::reduce(size_t index_i, Real dt)
 	{
-		return 1.0 * 1.0 * 0.5 * mass_[index_i] * (pos_[index_i][0] * pos_[index_i][0] + pos_[index_i][1] * pos_[index_i][1]);
+		return 0.5 * mass_[index_i] * (pos_[index_i][0] * pos_[index_i][0] + pos_[index_i][1] * pos_[index_i][1]);
 	}
 	//=================================================================================================//
 } // namespace SPH
