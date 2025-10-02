@@ -23,7 +23,7 @@ BaseDensitySummationInner::BaseDensitySummationInner(BaseInnerRelation &inner_re
 void BaseDensitySummationInner::update(size_t index_i, Real dt)
 {
     rho_[index_i] = rho_sum_[index_i];
-    //Vol_[index_i] = mass_[index_i] / rho_[index_i];
+    Vol_[index_i] = mass_[index_i] / rho_[index_i];
 }
 //=================================================================================================//
 DensitySummationInner::DensitySummationInner(BaseInnerRelation &inner_relation)

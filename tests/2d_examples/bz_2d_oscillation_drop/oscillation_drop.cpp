@@ -1,32 +1,32 @@
 /**
  * @file 	Oscillation drop.cpp
- * @brief 	2D oscillation drop.
- * @author 	Yaru Ren, Chi Zhang and Xiangyu Hu
+ * @brief 	2D oscillation drop for volume conservation.
+ * @author 	Bo Zhang, Yaru Ren, Chi Zhang and Xiangyu Hu
  */
  /**
   * @brief 	SPHinXsys Library.
   */
 #include "sphinxsys.h"
 #include "energy.h"
-  /**
-  * @brief Namespace cite here.
-  */
+/**
+ * @brief Namespace cite here.
+ */
 using namespace SPH;
 /**
  * @brief Basic geometry parameters and numerical setup.
  */
-Real particle_spacing_ref = 1.0 / 100; 		/**< Initial reference particle spacing.*/
+Real particle_spacing_ref = 1.0 / 50;   /**< Initial reference particle spacing.*/
 Real BW = particle_spacing_ref * 4; 	/**< Extending width for BCs. */
 /**
  * @brief Material properties of the fluid.
  */
 Real rho0_f = 1000.0;						/**< Reference density of fluid.*/
-Real U_f = 1.0;		                       /**< Characteristic velocity.*/    //2.0*sqrt(gravity_g*LH)
-Real c_f = 20.0 * U_f;					  /**< Reference sound speed.*/ //5.0*U_f
+Real U_f = 1.0;		                        /**< Characteristic velocity.*/    //2.0*sqrt(gravity_g*LH)
+Real c_f = 20.0 * U_f;					    /**< Reference sound speed.*/ //5.0*U_f
 
 //for the circle parameter
 Vec2d Circle_center(0, 0);    //circle center
-Real  Circle_radius = 1.0; //circle radius 0.1
+Real  Circle_radius = 1.0;    //circle radius 0.1
 int   Circle_resolution(100); //resolution
 
 Real DL = 4 * Circle_radius;
@@ -53,10 +53,8 @@ public:
 	void update(size_t index_particle_i, Real dt)
 	{
 		/** initial velocity profile */
-
 		vel_[index_particle_i][0] = 1.0 * pos_[index_particle_i][0];
-		vel_[index_particle_i][1] = -1.0 * pos_[index_particle_i][1];
-		//p_[index_particle_i] = (1.0 - (pos_[index_particle_i][0] * pos_[index_particle_i][0] + pos_[index_particle_i][1] * pos_[index_particle_i][1]));
+        vel_[index_particle_i][1] = -1.0 * pos_[index_particle_i][1];
 	}
 };
 /**
@@ -72,8 +70,6 @@ public:
 protected:
 	void update(size_t index_particle_i, Real dt)
 	{
-		//acc_prior_[index_particle_i][0] = -1.2 * 1.2 * pos_[index_particle_i][0];
-		//acc_prior_[index_particle_i][1] = -1.2 * 1.2 * pos_[index_particle_i][1];
 		acc_prior_[index_particle_i][0] = -1.0 * 1.0 * pos_[index_particle_i][0];
 		acc_prior_[index_particle_i][1] = -1.0 * 1.0 * pos_[index_particle_i][1];
 	}
@@ -106,7 +102,6 @@ int main(int ac, char* av[])
 	FluidBody water_block(sph_system, makeShared<WaterBlock>("WaterBody"));
 	water_block.defineBodyLevelSetShape();
 	water_block.defineParticlesAndMaterial<BaseParticles, WeaklyCompressibleFluid>(rho0_f, c_f);
-	// Using relaxed particle distribution if needed
 	(!sph_system.RunParticleRelaxation() && sph_system.ReloadParticles())
 		? water_block.generateParticles<ParticleGeneratorReload>(io_environment, water_block.getName())
 		: water_block.generateParticles<ParticleGeneratorLattice>();
@@ -114,7 +109,6 @@ int main(int ac, char* av[])
 	ObserverBody fluid_observer(sph_system, "FluidObserver");
 	StdVec<Vecd> observation_location = { Vecd(0.0, 0.0) };
 	fluid_observer.generateParticles<ObserverParticleGenerator>(observation_location);
-
 	//----------------------------------------------------------------------
 	//	Define body relation map.
 	//	The contact map gives the topological connections between the bodies.
@@ -172,20 +166,20 @@ int main(int ac, char* av[])
 	 */
 	Dynamics1Level<fluid_dynamics::Integration1stHalfRiemannConsistency> fluid_pressure_relaxation(water_block_inner);
 	Dynamics1Level<fluid_dynamics::Integration2ndHalfRiemann> fluid_density_relaxation(water_block_inner);
-	InteractionWithUpdate<KernelCorrectionMatrixInner> corrected_configuration_fluid(water_block_inner, 0.3);
+	InteractionWithUpdate<KernelCorrectionMatrixInner> corrected_configuration_fluid(water_block_inner, 0.9);
 	InteractionWithUpdate<fluid_dynamics::DensitySummationFreeSurfaceInner> fluid_density_by_summation(water_block_inner);
 	SharedPtr<Gravity> gravity_ptr = makeShared<Gravity>(Vecd(0.0, 0.0));
 	SimpleDynamics<TimeStepInitialization> fluid_step_initialization(water_block, gravity_ptr);
 	ReduceDynamics<fluid_dynamics::AdvectionTimeStepSize> fluid_advection_time_step(water_block, U_f);
 	ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> fluid_acoustic_time_step(water_block);
-	/** We can output a method-specific particle data for debug */
 	water_block.addBodyStateForRecording<Real>("Pressure");
 	water_block.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
+    water_block.addBodyStateForRecording<Real>("VolumetricMeasure");
+    water_block.addBodyStateForRecording<Real>("DensityChangeRate");
 	//----------------------------------------------------------------------
 	//	Define the methods for I/O operations, observations
 	//	and regression tests of the simulation.
 	//----------------------------------------------------------------------
-
 	BodyStatesRecordingToPlt body_states_recording(io_environment, sph_system.real_bodies_);
 	RestartIO restart_io(io_environment, sph_system.real_bodies_);
 	RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<KineticEnergy>>>
@@ -194,7 +188,6 @@ int main(int ac, char* av[])
 		write_water_potential_energy(io_environment, water_block);
 	RegressionTestDynamicTimeWarping<ObservedQuantityRecording<Real>>
 		write_recorded_water_pressure("Pressure", io_environment, fluid_observer_contact);
-
 	//----------------------------------------------------------------------
 	//	Prepare the simulation with cell linked list, configuration
 	//	and case specified initial condition if necessary.
@@ -240,7 +233,7 @@ int main(int ac, char* av[])
 			/** outer loop for dual-time criteria time-stepping. */
 			time_instance = TickCount::now();
 			fluid_step_initialization.exec();
-			Real advection_dt = fluid_advection_time_step.exec();
+			Real advection_dt = 0.3*fluid_advection_time_step.exec();
 			fluid_density_by_summation.exec();
 			corrected_configuration_fluid.exec();
 			interval_computing_time_step += TickCount::now() - time_instance;
@@ -284,7 +277,6 @@ int main(int ac, char* av[])
 		TickCount t2 = TickCount::now();
 		TickCount t3 = TickCount::now();
 		interval += t3 - t2;
-
 	}
 	TickCount t4 = TickCount::now();
 

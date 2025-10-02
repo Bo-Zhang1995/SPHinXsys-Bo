@@ -71,5 +71,43 @@ void BaseIntegration1stHalfConsistency<RiemannSolverType>::interaction(size_t in
     this->drho_dt_[index_i] = rho_dissipation * this->rho_[index_i];
 }
 //=================================================================================================//
+//=================================================================================================//
+template <class RiemannSolverType>
+BaseIntegration2ndHalfConsistency<RiemannSolverType>::BaseIntegration2ndHalfConsistency(BaseInnerRelation &inner_relation)
+    : BaseIntegration2ndHalf<RiemannSolverType>(inner_relation),
+      B_(*this->particles_->template registerSharedVariable<Matd>("KernelCorrectionMatrix", Matd::Identity())) {}
+//=================================================================================================//
+template <class RiemannSolverType>
+void BaseIntegration2ndHalfConsistency<RiemannSolverType>::initialization(size_t index_i, Real dt)
+{
+    BaseIntegration2ndHalf<RiemannSolverType>::initialization(index_i, dt);
+}
+//=================================================================================================//
+template <class RiemannSolverType>
+void BaseIntegration2ndHalfConsistency<RiemannSolverType>::interaction(size_t index_i, Real dt)
+{
+    Real density_change_rate(0);
+    Vecd p_dissipation = Vecd::Zero();
+    const Neighborhood &inner_neighborhood = inner_configuration_[index_i];
+    for (size_t n = 0; n != inner_neighborhood.current_size_; ++n)
+    {
+        size_t index_j = inner_neighborhood.j_[n];
+        const Vecd &e_ij = inner_neighborhood.e_ij_[n];
+        Real dW_ijV_j = inner_neighborhood.dW_ijV_j_[n];
+
+        Real u_jump = (vel_[index_i] - vel_[index_j]).dot(e_ij);
+        density_change_rate += (vel_[index_i] - vel_[index_j]).dot(0.5 * (B_[index_i] + B_[index_j]) * e_ij) * dW_ijV_j;
+        p_dissipation += riemann_solver_.DissipativePJump(u_jump) * dW_ijV_j * e_ij;
+    }
+    drho_dt_[index_i] += density_change_rate * rho_[index_i];
+    acc_[index_i] = p_dissipation / rho_[index_i];
+}
+//=================================================================================================//
+template <class RiemannSolverType>
+void BaseIntegration2ndHalfConsistency<RiemannSolverType>::update(size_t index_i, Real dt)
+{
+    BaseIntegration2ndHalf<RiemannSolverType>::update(index_i, dt);
+}
+//=================================================================================================//
 } // namespace fluid_dynamics
 } // namespace SPH
