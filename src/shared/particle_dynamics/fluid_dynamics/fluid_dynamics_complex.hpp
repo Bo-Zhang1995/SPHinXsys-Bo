@@ -196,6 +196,7 @@ void BaseIntegration1stHalfWithWall<BaseIntegration1stHalfType>::
     }
     this->acc_[index_i] += acceleration / this->rho_[index_i];
     this->drho_dt_[index_i] += rho_dissipation * this->rho_[index_i];
+    this->vel_div_[index_i] += abs(rho_dissipation);
 }
 //=================================================================================================//
 template <class BaseIntegration1stHalfType>
@@ -285,6 +286,7 @@ void BaseIntegration2ndHalfWithWall<BaseIntegration2ndHalfType>::
         }
     }
     this->drho_dt_[index_i] += density_change_rate * this->rho_[index_i];
+    this->vel_div_[index_i] += abs(density_change_rate);
     this->acc_[index_i] += p_dissipation / this->rho_[index_i];
 }
 //=================================================================================================//

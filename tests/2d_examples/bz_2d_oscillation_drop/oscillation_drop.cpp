@@ -173,14 +173,18 @@ int main(int ac, char* av[])
 	ReduceDynamics<fluid_dynamics::AdvectionTimeStepSize> fluid_advection_time_step(water_block, U_f);
 	ReduceDynamics<fluid_dynamics::AcousticTimeStepSize> fluid_acoustic_time_step(water_block);
 	water_block.addBodyStateForRecording<Real>("Pressure");
-	water_block.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
-    water_block.addBodyStateForRecording<Real>("VolumetricMeasure");
-    water_block.addBodyStateForRecording<Real>("DensityChangeRate");
+    water_block.addBodyStateForRecording<Real>("Density");
+    water_block.addBodyStateForRecording<Real>("DensitySummation"); // Reinitialized density
+    water_block.addBodyStateForRecording<Real>("DensityEvolution"); // Evoluted density
+    water_block.addBodyStateForRecording<Real>("VolumetricMeasure"); // Particle volume
+    water_block.addBodyStateForRecording<Matd>("KernelCorrectionMatrix");
+    water_block.addBodyStateForRecording<Real>("DensityChangeRate"); // - rho div(v)
+    water_block.addBodyStateForRecording<Real>("DensityError"); // Error between reinitialized and reference density
 	//----------------------------------------------------------------------
 	//	Define the methods for I/O operations, observations
 	//	and regression tests of the simulation.
 	//----------------------------------------------------------------------
-	BodyStatesRecordingToPlt body_states_recording(io_environment, sph_system.real_bodies_);
+	BodyStatesRecordingToVtp body_states_recording(io_environment, sph_system.real_bodies_);
 	RestartIO restart_io(io_environment, sph_system.real_bodies_);
 	RegressionTestDynamicTimeWarping<ReducedQuantityRecording<ReduceDynamics<KineticEnergy>>>
 		write_water_kinetic_energy(io_environment, water_block);
@@ -188,6 +192,10 @@ int main(int ac, char* av[])
 		write_water_potential_energy(io_environment, water_block);
 	RegressionTestDynamicTimeWarping<ObservedQuantityRecording<Real>>
 		write_recorded_water_pressure("Pressure", io_environment, fluid_observer_contact);
+	ReducedQuantityRecording<Average<QuantityAbsoluteSummation>>
+        write_averaged_velocity_divergence(io_environment, water_block, "VelocityDivergence");
+    ReducedQuantityRecording<Average<QuantityAbsoluteSummation>>
+        write_averaged_density_error(io_environment, water_block, "DensityError");
 	//----------------------------------------------------------------------
 	//	Prepare the simulation with cell linked list, configuration
 	//	and case specified initial condition if necessary.
@@ -202,7 +210,7 @@ int main(int ac, char* av[])
 	int screen_output_interval = 100;
 	int observation_sample_interval = 50;
 	int restart_output_interval = screen_output_interval * 10;
-	Real End_Time = 30.0; /**< End time. */
+	Real End_Time = 20.0; /**< End time. */
 	Real D_Time = 0.01;	  /**< Time stamps for output of body states. */
 	Real dt = 0.0;		  /**< Default acoustic time step sizes. */
 	//----------------------------------------------------------------------
@@ -221,6 +229,8 @@ int main(int ac, char* av[])
 	write_water_kinetic_energy.writeToFile(number_of_iterations);
 	write_water_potential_energy.writeToFile(number_of_iterations);
 	write_recorded_water_pressure.writeToFile(number_of_iterations);
+    write_averaged_density_error.writeToFile(number_of_iterations);
+    write_averaged_velocity_divergence.writeToFile(number_of_iterations);
 	/**
 	 * @brief 	Main loop starts here.
 	 */
@@ -269,12 +279,13 @@ int main(int ac, char* av[])
 			water_block_inner.updateConfiguration();
 			interval_updating_configuration += TickCount::now() - time_instance;
 		}
-
+        TickCount t2 = TickCount::now();
 		body_states_recording.writeToFile();
 		write_water_kinetic_energy.writeToFile(number_of_iterations);
 		write_water_potential_energy.writeToFile(number_of_iterations);
 		write_recorded_water_pressure.writeToFile(number_of_iterations);
-		TickCount t2 = TickCount::now();
+        write_averaged_density_error.writeToFile(number_of_iterations);
+        write_averaged_velocity_divergence.writeToFile(number_of_iterations);
 		TickCount t3 = TickCount::now();
 		interval += t3 - t2;
 	}

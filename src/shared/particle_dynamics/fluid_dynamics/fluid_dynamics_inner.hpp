@@ -200,6 +200,7 @@ void BaseIntegration1stHalf<RiemannSolverType>::
     }
     acc_[index_i] += acceleration / rho_[index_i];
     drho_dt_[index_i] = rho_dissipation * rho_[index_i];
+    vel_div_[index_i] = abs(rho_dissipation);
 }
 //=================================================================================================//
 template <class RiemannSolverType>
@@ -217,8 +218,6 @@ template <class RiemannSolverType>
 void BaseIntegration2ndHalf<RiemannSolverType>::update(size_t index_i, Real dt)
 {
     rho_[index_i] += drho_dt_[index_i] * dt * 0.5;
-    /* The volume is not updated here. */
-    //Vol_[index_i] = mass_[index_i] / rho_[index_i];
 }
 //=================================================================================================//
 template <class RiemannSolverType>
@@ -239,6 +238,7 @@ void BaseIntegration2ndHalf<RiemannSolverType>::
         p_dissipation += riemann_solver_.DissipativePJump(u_jump) * dW_ijV_j * e_ij;
     }
     drho_dt_[index_i] += density_change_rate * rho_[index_i];
+    vel_div_[index_i] += abs(density_change_rate);
     acc_[index_i] = p_dissipation / rho_[index_i];
 };
 //=================================================================================================//

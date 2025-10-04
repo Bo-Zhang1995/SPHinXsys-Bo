@@ -213,7 +213,6 @@ class BaseIntegration2ndHalfWithWall : public InteractionWithWall<BaseIntegratio
     BaseIntegration2ndHalfWithWall(Args &&...args)
         : InteractionWithWall<BaseIntegration2ndHalfType>(std::forward<Args>(args)...){};
     virtual ~BaseIntegration2ndHalfWithWall(){};
-
     inline void interaction(size_t index_i, Real dt = 0.0);
 };
 

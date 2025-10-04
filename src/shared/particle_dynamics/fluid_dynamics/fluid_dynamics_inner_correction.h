@@ -38,29 +38,7 @@ namespace SPH
 namespace fluid_dynamics
 {
 /**
- * @class BaseIntegration1stHalfCorrect
- */
-template <class RiemannSolverType>
-class BaseIntegration1stHalfCorrect : public BaseIntegration1stHalf<RiemannSolverType>
-{
-  public:
-    explicit BaseIntegration1stHalfCorrect(BaseInnerRelation &inner_relation);
-    virtual ~BaseIntegration1stHalfCorrect(){};
-
-    using BaseIntegration1stHalf<RiemannSolverType>::BaseIntegration1stHalf;
-    void initialization(size_t index_i, Real dt);
-    void interaction(size_t index_i, Real dt);
-
-  protected:
-    StdLargeVec<Matd> p_B_;
-    StdLargeVec<Matd> &B_;
-};
-using Integration1stHalfCorrect = BaseIntegration1stHalfCorrect<NoRiemannSolver>;
-/** define the mostly used pressure relaxation scheme using Riemann solver */
-using Integration1stHalfRiemannCorrect = BaseIntegration1stHalfCorrect<AcousticRiemannSolver>;
-
-/**
- * @class BaseIntegration1stHalfConsistCorrect
+ * @class BaseIntegration1stHalfConsistency
  */
 template <class RiemannSolverType>
 class BaseIntegration1stHalfConsistency : public BaseIntegration1stHalf<RiemannSolverType>
@@ -81,15 +59,15 @@ using Integration1stHalfConsistency = BaseIntegration1stHalfConsistency<NoRieman
 using Integration1stHalfRiemannConsistency = BaseIntegration1stHalfConsistency<AcousticRiemannSolver>;
 
 /**
- * @class BaseIntegration2ndHalfConsistency
+ * @class BaseIntegration2ndHalfCorrect
  * @brief Template density relaxation scheme with different Riemann solver
  */
 template <class RiemannSolverType>
-class BaseIntegration2ndHalfConsistency : public BaseIntegration2ndHalf<RiemannSolverType>
+class BaseIntegration2ndHalfCorrect : public BaseIntegration2ndHalf<RiemannSolverType>
 {
   public:
-    explicit BaseIntegration2ndHalfConsistency(BaseInnerRelation &inner_relation);
-    virtual ~BaseIntegration2ndHalfConsistency() {};
+    explicit BaseIntegration2ndHalfCorrect(BaseInnerRelation &inner_relation);
+    virtual ~BaseIntegration2ndHalfCorrect() {};
 
     using BaseIntegration2ndHalf<RiemannSolverType>::BaseIntegration2ndHalf;
     void initialization(size_t index_i, Real dt = 0.0);
@@ -99,9 +77,8 @@ class BaseIntegration2ndHalfConsistency : public BaseIntegration2ndHalf<RiemannS
   protected:
     StdLargeVec<Matd> &B_;
 };
-using Integration2ndHalfConsistency = BaseIntegration2ndHalfConsistency<NoRiemannSolver>;
-/** define the consistency density relaxation scheme using Riemann solver */
-using Integration2ndHalfRiemannConsistency = BaseIntegration2ndHalfConsistency<AcousticRiemannSolver>;
+using Integration2ndHalfCorrect = BaseIntegration2ndHalfCorrect<NoRiemannSolver>;
+using Integration2ndHalfRiemannCorrect = BaseIntegration2ndHalfCorrect<AcousticRiemannSolver>;
 } // namespace fluid_dynamics
 } // namespace SPH
 #endif // FLUID_DYNAMICS_INNER_CORRECTION_H

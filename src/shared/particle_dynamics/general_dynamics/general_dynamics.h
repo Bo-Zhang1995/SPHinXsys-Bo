@@ -200,6 +200,28 @@ class MaximumSpeed : public LocalDynamicsReduce<Real, ReduceMax>,
     Real reduce(size_t index_i, Real dt = 0.0);
 };
 
+class QuantityAbsoluteSummation : public LocalDynamicsReduce<Real, ReduceSum<Real>>, 
+                                  public GeneralDataDelegateSimple
+{
+  public:
+    explicit QuantityAbsoluteSummation(SPHBody &sph_body, const std::string &variable_name)
+        : LocalDynamicsReduce<Real, ReduceSum<Real>>(sph_body, Real(0)),
+          GeneralDataDelegateSimple(sph_body),
+          variable_(*this->particles_->template getVariableByName<Real>(variable_name))
+    {
+        this->quantity_name_ = "TotalAbs" + variable_name;
+    };
+    virtual ~QuantityAbsoluteSummation() {};
+
+    Real reduce(size_t index_i, Real dt = 0.0)
+    {
+        return fabs(variable_[index_i]);
+    };
+
+  protected:
+    StdLargeVec<Real> &variable_;
+};
+
 /**
  * @class	PositionLowerBound
  * @brief	the lower bound of a body by reduced particle positions.

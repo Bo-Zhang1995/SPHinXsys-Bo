@@ -18,12 +18,16 @@ BaseDensitySummationInner::BaseDensitySummationInner(BaseInnerRelation &inner_re
       inv_sigma0_(1.0 / sph_body_.sph_adaptation_->LatticeNumberDensity())
 {
     particles_->registerVariable(rho_sum_, "DensitySummation");
+    particles_->registerVariable(rho_evo_, "DensityEvolution");
+    particles_->registerVariable(err_rho_, "DensityError");
 }
 //=================================================================================================//
 void BaseDensitySummationInner::update(size_t index_i, Real dt)
 {
-    rho_[index_i] = rho_sum_[index_i];
-    Vol_[index_i] = mass_[index_i] / rho_[index_i];
+    rho_evo_[index_i] = rho_[index_i]; //The density evolved by continuity equation before correction;
+    rho_[index_i] = rho_sum_[index_i]; //The density reinitialized by summation;
+    err_rho_[index_i] = fabs(rho_[index_i] - rho0_); //Density error between reinitialized and reference;
+    Vol_[index_i] = mass_[index_i] / rho_[index_i];  //Update the volume according to reinitialized density;
 }
 //=================================================================================================//
 DensitySummationInner::DensitySummationInner(BaseInnerRelation &inner_relation)
@@ -107,6 +111,7 @@ BaseIntegration::BaseIntegration(BaseInnerRelation &inner_relation)
       p_(*particles_->getVariableByName<Real>("Pressure")),
       drho_dt_(*particles_->registerSharedVariable<Real>("DensityChangeRate")), 
       Vol_(particles_->Vol_), mass_(particles_->mass_),
+      vel_div_(*particles_->registerSharedVariable<Real>("VelocityDivergence")),
       pos_(particles_->pos_), vel_(particles_->vel_),
       acc_(particles_->acc_), acc_prior_(particles_->acc_prior_),
       B_(*this->particles_->template registerSharedVariable<Matd>("KernelCorrectionMatrix", Matd::Identity())) {}

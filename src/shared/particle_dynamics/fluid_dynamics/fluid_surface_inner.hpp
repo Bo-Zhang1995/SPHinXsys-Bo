@@ -154,7 +154,10 @@ void SpatialTemporalFreeSurfaceIdentification<FreeSurfaceIdentification>::
 template <class DensitySummationType>
 void DensitySummationFreeSurface<DensitySummationType>::update(size_t index_i, Real dt)
 {
-    this->rho_[index_i] = ReinitializedDensity(this->rho_sum_[index_i], this->rho0_, this->rho_[index_i]);
+    this->rho_evo_[index_i] = this->rho_[index_i]; // The density evolved by continuity equation before correction;
+    //this->rho_[index_i] = ReinitializedDensity(this->rho_sum_[index_i], this->rho0_, this->rho_[index_i]); // The density reinitialized by summation;
+    this->err_rho_[index_i] = fabs(this->rho_[index_i] - this->rho0_); 
+    this->Vol_[index_i] = this->mass_[index_i] / this->rho_[index_i];
 }
 //=================================================================================================//
 template <class DensitySummationFreeSurfaceType>

@@ -39,25 +39,7 @@ namespace SPH
 namespace fluid_dynamics
 {
 /**
- * @class BaseIntegration1stHalfCorrectWithWall
- * @brief  template class pressure relaxation scheme together with wall boundary
- */
-template <class BaseIntegration1stHalfCorrectType>
-class BaseIntegration1stHalfCorrectWithWall : public InteractionWithWall<BaseIntegration1stHalfCorrectType>
-{
-  public:
-    template <typename... Args>
-    BaseIntegration1stHalfCorrectWithWall(Args &&...args)
-        : InteractionWithWall<BaseIntegration1stHalfCorrectType>(std::forward<Args>(args)...){};
-    virtual ~BaseIntegration1stHalfCorrectWithWall(){};
-    void interaction(size_t index_i, Real dt = 0.0);
-};
-
-using Integration1stHalfCorrectWithWall = BaseIntegration1stHalfCorrectWithWall<Integration1stHalfCorrect>;
-using Integration1stHalfRiemannCorrectWithWall = BaseIntegration1stHalfCorrectWithWall<Integration1stHalfRiemannCorrect>;
-
-/**
- * @class BaseIntegration1stHalfConsistencyCorrectWithWall
+ * @class BaseIntegration1stHalfConsistencyWithWall
  * @brief template class pressure relaxation scheme together with wall boundary
  */
 template <class BaseIntegration1stHalfConsistencyType>
@@ -74,6 +56,25 @@ public:
 
 using Integration1stHalfConsistencyWithWall = BaseIntegration1stHalfConsistencyWithWall<Integration1stHalfConsistency>;
 using Integration1stHalfRiemannConsistencyWithWall = BaseIntegration1stHalfConsistencyWithWall<Integration1stHalfRiemannConsistency>;
+
+/**
+ * @class BaseIntegration2ndHalfCorrectWithWall
+ * @brief template density relaxation scheme without using different Riemann solvers.
+ * The difference from the free surface version is that no Riemann problem is applied
+ */
+template <class BaseIntegration2ndHalfCorrectType>
+class BaseIntegration2ndHalfCorrectWithWall : public InteractionWithWall<BaseIntegration2ndHalfCorrectType>
+{
+  public:
+    template <typename... Args>
+    BaseIntegration2ndHalfCorrectWithWall(Args &&...args)
+        : InteractionWithWall<BaseIntegration2ndHalfCorrectType>(std::forward<Args>(args)...){};
+    virtual ~BaseIntegration2ndHalfCorrectWithWall(){};
+    inline void interaction(size_t index_i, Real dt = 0.0);
+};
+
+using Integration2ndHalfCorrectWithWall = BaseIntegration2ndHalfCorrectWithWall<Integration2ndHalfCorrect>;
+using Integration2ndHalfRiemannCorrectWithWall = BaseIntegration2ndHalfCorrectWithWall<Integration2ndHalfRiemannCorrect>;
 
 } // namespace fluid_dynamics
 } // namespace SPH
